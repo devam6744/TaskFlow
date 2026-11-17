@@ -1,0 +1,27 @@
+# Core Django & DRF
+django>=5.1,<5.2
+djangorestframework>=3.15,<3.16
+django-cors-headers>=4.4.0
+djangorestframework-simplejwt>=5.3.1
+
+# Database (Supabase PostgreSQL)
+psycopg[binary]>=3.2.0
+dj-database-url>=2.2.0
+
+# Environment Variables
+python-dotenv>=1.0.1
+
+# API Documentation
+drf-spectacular>=0.27.2
+
+# Testing & Quality
+pytest>=8.3.0
+pytest-django>=4.9.0
+factory-boy>=3.3.1
+coverage>=7.6.0
+ruff>=0.6.0
+
+# Future Phases (Celery / Redis / Channels)
+# celery>=5.4.0
+# redis>=5.0.0
+# channels>=4.1.0
