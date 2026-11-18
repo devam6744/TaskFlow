@@ -1,10 +1,18 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def clear_cache_between_tests():
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

@@ -3,10 +3,12 @@ import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProtectedRoute } from './features/auth/ProtectedRoute';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { ToastContainer } from './components/ui/ToastContainer';
 
 function App() {
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
