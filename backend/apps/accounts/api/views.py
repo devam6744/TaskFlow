@@ -97,7 +97,7 @@ class LoginView(APIView):
             429: OpenApiResponse(description="Too many requests"),
         }
     )
-    @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=False))
+    @method_decorator(ratelimit(key='ip', rate='30/m', method='POST', block=False))
     def post(self, request: Request) -> Response:
         if getattr(request, 'limited', False):
             return Response(

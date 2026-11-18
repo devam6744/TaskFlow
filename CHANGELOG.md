@@ -22,14 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full test suite (`apps/accounts/tests/test_auth_api.py`) with 8 passing automated test cases.
 - Validated OpenAPI 3.0 documentation via `drf-spectacular`.
 - Frontend Executive Light Theme & Landing Page Overhaul:
-  - Separate Public Landing Page (`/`) with Hero, Agile Board preview, Feature Matrix, and Footer.
-  - Dedicated Authentication routes (`/login`, `/register`) with light theme aesthetics.
+  - Separate Public Landing Page (`/`) with Hero, Agile Board preview, Feature Matrix, Agile Sprint Lifecycle (`#workflow`), Enterprise Security (`#security`), and Footer (`#about`).
+  - Seamless SPA Unified Auth (`AuthPage.tsx`) with in-place tab switching between Sign In and Create Account (removed split screen).
+  - Fixed logout redirection to send user directly to Landing Page (`/`).
   - Dedicated Agile Command Center Dashboard (`/dashboard`) guarded by `ProtectedRoute`.
   - Manageable User Profile Modal (`ProfileModal.tsx`) for account name updates and UUID copy.
   - Full mobile responsiveness with collapsible hamburger drawer and responsive cards across all device breakpoints.
-  - Professional Footer with credits: Devam Mandli (`mandlidevam9@gmail.com`, LinkedIn, GitHub).
+  - Professional Footer with credits: Devam Mandli (`mandlidevam9@gmail.com`, LinkedIn: `https://linkedin.com/in/devam-mandli`, GitHub: `https://github.com/devam6744`).
   - Strict zero-emoji policy: 100% professional SVG vector icons.
-  - Removed all diagnostic clutter, internal token details, and external API buttons.
+  - Backend CORS & Rate-Limiting optimizations (added 127.0.0.1 to allowed origins and increased limit to 30/m for smooth testing).
 - 4-file documentation architecture:
   - `docs/learning/phase-1-2_auth_concepts.md`
   - `docs/decisions/phase-1-2_decisions.md`

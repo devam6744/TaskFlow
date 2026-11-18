@@ -2,6 +2,8 @@ import React from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Features } from './components/Features';
+import { Workflow } from './components/Workflow';
+import { Security } from './components/Security';
 import { Footer } from './components/Footer';
 
 export const LandingPage: React.FC = () => {
@@ -11,6 +13,8 @@ export const LandingPage: React.FC = () => {
       <main className="flex-1">
         <Hero />
         <Features />
+        <Workflow />
+        <Security />
       </main>
       <Footer />
     </div>

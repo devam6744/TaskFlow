@@ -44,7 +44,7 @@ export const DashboardPage: React.FC = () => {
         title: 'Signed Out',
         description: 'You have been securely signed out.',
       });
-      navigate('/login');
+      navigate('/');
     }
   };
 

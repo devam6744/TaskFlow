@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LandingPage } from './features/landing/LandingPage';
-import { LoginPage } from './features/auth/LoginPage';
-import { RegisterPage } from './features/auth/RegisterPage';
+import { AuthPage } from './features/auth/AuthPage';
 import { ProtectedRoute } from './features/auth/ProtectedRoute';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -12,8 +11,8 @@ function App() {
       <ToastContainer />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login" element={<AuthPage initialMode="login" />} />
+        <Route path="/register" element={<AuthPage initialMode="register" />} />
         <Route
           path="/dashboard"
           element={

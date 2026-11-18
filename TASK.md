@@ -31,15 +31,17 @@
 - [x] Write backend automated test suite (`apps/accounts/tests/test_auth_api.py`) — 8/8 tests passed
 - [x] Verify OpenAPI 3.0 schema generation with `drf-spectacular` (0 errors, 0 warnings)
 - [x] Frontend Executive Light Theme Redesign & Landing Page:
-  - Separate Public Landing Page (`/`) with Hero, Agile Board Mockup, Feature Matrix, and Footer
-  - Dedicated Auth Flows (`/login`, `/register`) with clean light aesthetics
+  - Separate Public Landing Page (`/`) with Hero, Agile Board Mockup, Feature Matrix, Agile Workflow (`#workflow`), Security (`#security`), and Footer (`#about`)
+  - Seamless SPA Unified Auth Card (`AuthPage.tsx`) with in-place tab switching between Sign In and Create Account (no split screen)
   - Dedicated Dashboard (`/dashboard`) guarded by `ProtectedRoute`
+  - Logout flow redirects directly to Landing Page (`/`)
   - Manageable User Profile Modal (`ProfileModal.tsx`) for account management & UUID copy
   - Full mobile responsiveness with collapsible hamburger drawer and responsive cards
-  - Professional Footer with credits: Devam Mandli (`mandlidevam9@gmail.com`, LinkedIn, GitHub)
+  - Professional Footer with credits: Devam Mandli (`mandlidevam9@gmail.com`, LinkedIn: `linkedin.com/in/devam-mandli`, GitHub: `devam6744`)
+  - CORS & Rate-limit optimizations on backend (supports localhost and 127.0.0.1, relaxed 30/m limit for testing)
   - Zero emojis policy strictly enforced (100% SVG Lucide & Vector icons)
   - Cleaned all diagnostic clutter and removed unwanted external API buttons
-  - Production build verified (`npm run build` in 2.16s)
+  - Production build verified (`npm run build` in 2.05s)
 
 ---
 
