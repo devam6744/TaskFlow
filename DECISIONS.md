@@ -18,8 +18,15 @@
 - **Context:** Primary database selection for relational integrity, JSONB support, and managed reliability.
 - **Decision:** Use Supabase Managed PostgreSQL via standard Django ORM with `dj-database-url` or `psycopg`. Backend enforces application logic and multi-tenancy.
 
-## ADR-004: Frontend Baseline — React, TypeScript, Vite & Tailwind
-- **Date:** 2026-11-17
-- **Status:** Approved
-- **Context:** Fast build times, robust typing, accessible component structure.
-- **Decision:** Vite + React 18 + TypeScript + TanStack Query + Tailwind CSS + shadcn/ui.
+## ADR-005: Custom User Model & Email Identity
+- **Date:** 2026-11-18
+- **Status:** Approved & Implemented
+- **Context:** Deciding user primary identity and model extension strategy before initial migration.
+- **Decision:** Subclass `AbstractBaseUser` + `PermissionsMixin` with UUIDv4 primary keys and normalized email. Full details in [phase-1-2_decisions.md](file:///c:/Users/maushmi/Desktop/DAJNGO/teampluse/docs/decisions/phase-1-2_decisions.md).
+
+## ADR-006: Dual-Token JWT with HttpOnly Refresh Cookie
+- **Date:** 2026-11-18
+- **Status:** Approved & Implemented
+- **Context:** Token storage and revocation mechanism for SPA.
+- **Decision:** 15-minute access token in memory (Zustand) + 7-day refresh token in HttpOnly cookie with rotation and database blacklisting. Defends against both XSS and CSRF. Full details in [phase-1-2_decisions.md](file:///c:/Users/maushmi/Desktop/DAJNGO/teampluse/docs/decisions/phase-1-2_decisions.md).
+

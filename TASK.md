@@ -14,20 +14,39 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 1 & 2 — Custom User Model & Authentication Foundation (NEXT)
-- [ ] Initialize `apps/accounts` Django app
-- [ ] Implement Custom User Model (`AbstractBaseUser` with normalized email as unique identifier)
-- [ ] Enforce Custom User Model in `config/settings/base.py` (`AUTH_USER_MODEL = 'accounts.User'`)
-- [ ] Create initial database migration on Supabase PostgreSQL (MUST be done before any other app migrations)
-- [ ] Set up JWT Authentication (SimpleJWT: short-lived access token + HttpOnly refresh cookie)
-- [ ] Implement Auth API endpoints:
-  - `POST /api/v1/auth/register/`
-  - `POST /api/v1/auth/login/`
-  - `POST /api/v1/auth/logout/`
-  - `POST /api/v1/auth/refresh/`
-  - `GET /api/v1/me/`
-- [ ] Write backend automated tests for authentication and negative authorization cases
-- [ ] Set up frontend TanStack Query + Axios interceptor + Auth Context
+## 🏁 Phase 1 & 2: Custom User Model & Authentication Foundation (COMPLETED ✅)
+- [x] Create comprehensive 4-file documentation framework (`docs/learning/`, `docs/decisions/`, `docs/phase-reports/`, `docs/CONTEXT.md`)
+- [x] Initialize `apps/accounts` Django modular app structure
+- [x] Implement Custom User Model (`AbstractBaseUser` with UUID PK and normalized unique email)
+- [x] Enforce Custom User Model in `config/settings/base.py` (`AUTH_USER_MODEL = 'accounts.User'`)
+- [x] Create and run initial database migrations on live Supabase PostgreSQL 17 (`accounts_user`, `token_blacklist`)
+- [x] Configure SimpleJWT with token rotation and server-side blacklisting
+- [x] Implement Service Layer (`apps/accounts/services.py`) with atomic transactions and timing-attack defense
+- [x] Implement Auth API endpoints (`apps/accounts/api/views.py`):
+  - `POST /api/v1/auth/register/` (201 Created + HttpOnly cookie)
+  - `POST /api/v1/auth/login/` (200 OK + IP Rate Limit 5/min + Anti-Enumeration + HttpOnly cookie)
+  - `POST /api/v1/auth/refresh/` (200 OK + Token Rotation + Cookie Refresh)
+  - `POST /api/v1/auth/logout/` (200 OK + Server-side Blacklisting + Cookie Clearing)
+  - `GET /api/v1/auth/me/` (200 OK + Bearer Token Authorization)
+- [x] Write backend automated test suite (`apps/accounts/tests/test_auth_api.py`) — 8/8 tests passed
+- [x] Verify OpenAPI 3.0 schema generation with `drf-spectacular` (0 errors, 0 warnings)
+- [x] Frontend Auth Shell:
+  - Axios client with Bearer header injection & 401 silent token refresh queue
+  - In-memory Zustand store (zero tokens in localStorage for XSS protection)
+  - `LoginPage.tsx` & `RegisterPage.tsx`
+  - `ProtectedRoute.tsx` route guard
+  - `DashboardPage.tsx` user profile view with live logout
+  - Verified production build with `npm run build`
+
+---
+
+## 🚀 Active Milestone: Phase 3 — Workspace & Multi-Tenancy Isolation (NEXT)
+- [ ] Implement `Workspace` and `WorkspaceMember` models (UUID PKs, slug, role choices: ADMIN, MEMBER, VIEWER)
+- [ ] Implement Workspace multi-tenancy middleware / permission classes
+- [ ] Service layer: `create_workspace`, `invite_member`, `accept_invite`
+- [ ] Workspace API endpoints (`/api/v1/workspaces/`)
+- [ ] Tenant data isolation tests (ensure User A cannot see User B's workspace)
+- [ ] Frontend Workspace switcher & creation modal
 
 ---
 
