@@ -20,7 +20,7 @@ export const RegisterPage: React.FC = () => {
 
   // Live password strength calculation
   const passwordStrength = useMemo(() => {
-    if (!password) return { score: 0, label: 'Empty', color: 'bg-slate-700', width: '0%' };
+    if (!password) return { score: 0, label: 'Empty', color: 'bg-slate-200', width: '0%' };
     let score = 0;
     if (password.length >= 8) score += 1;
     if (/[A-Z]/.test(password)) score += 1;
@@ -33,9 +33,9 @@ export const RegisterPage: React.FC = () => {
       case 2:
         return { score: 2, label: 'Fair', color: 'bg-amber-500', width: '50%' };
       case 3:
-        return { score: 3, label: 'Strong', color: 'bg-indigo-500', width: '75%' };
+        return { score: 3, label: 'Strong', color: 'bg-blue-600', width: '75%' };
       case 4:
-        return { score: 4, label: 'Enterprise Grade', color: 'bg-emerald-500', width: '100%' };
+        return { score: 4, label: 'Enterprise Grade', color: 'bg-emerald-600', width: '100%' };
       default:
         return { score: 0, label: 'Too Short', color: 'bg-rose-500', width: '15%' };
     }
@@ -66,7 +66,7 @@ export const RegisterPage: React.FC = () => {
         title: 'Account Created',
         description: `Welcome to TaskFlow, ${user.display_name}!`,
       });
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       if (err.response?.data?.email) {
         setError(err.response.data.email[0]);
@@ -75,7 +75,7 @@ export const RegisterPage: React.FC = () => {
       } else if (err.response?.data?.detail) {
         setError(err.response.data.detail);
       } else {
-        setError('Unable to register. Please verify your details.');
+        setError('Unable to complete registration. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -88,20 +88,20 @@ export const RegisterPage: React.FC = () => {
       subtitle="Join TaskFlow to orchestrate agile sprints, backlogs, and multi-tenant workflows."
     >
       {error && (
-        <div className="mb-6 p-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-sm flex items-start gap-3 backdrop-blur-sm animate-shake">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs leading-relaxed">{error}</div>
+        <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-shake">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="flex-1 leading-relaxed">{error}</div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Full Name */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
             Full Name
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <User className="w-4 h-4" />
             </div>
             <input
@@ -109,19 +109,19 @@ export const RegisterPage: React.FC = () => {
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Devam Sharma"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all duration-200"
+              placeholder="Devam Mandli"
+              className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
           </div>
         </div>
 
         {/* Work Email */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
             Work Email Address
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Mail className="w-4 h-4" />
             </div>
             <input
@@ -130,18 +130,18 @@ export const RegisterPage: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="devam@company.com"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all duration-200"
+              className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
           </div>
         </div>
 
         {/* Password */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
             Master Password
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Lock className="w-4 h-4" />
             </div>
             <input
@@ -151,12 +151,13 @@ export const RegisterPage: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Min. 8 characters"
-              className="w-full pl-10 pr-10 py-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all duration-200"
+              className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              aria-label="Toggle password visibility"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -166,14 +167,14 @@ export const RegisterPage: React.FC = () => {
           {password && (
             <div className="mt-2 space-y-1">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Strength:</span>
+                <span className="text-slate-500">Password Strength:</span>
                 <span className={`font-semibold ${
-                  passwordStrength.score >= 3 ? 'text-emerald-400' : passwordStrength.score === 2 ? 'text-amber-400' : 'text-rose-400'
+                  passwordStrength.score >= 3 ? 'text-emerald-600' : passwordStrength.score === 2 ? 'text-amber-600' : 'text-rose-600'
                 }`}>
                   {passwordStrength.label}
                 </span>
               </div>
-              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                 <div
                   className={`h-full ${passwordStrength.color} transition-all duration-300 rounded-full`}
                   style={{ width: passwordStrength.width }}
@@ -187,27 +188,27 @@ export const RegisterPage: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 border border-indigo-400/30 flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
+          className="w-full mt-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 cursor-pointer"
         >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Creating Your Account...</span>
+              <span>Creating Account...</span>
             </>
           ) : (
             <>
               <span>Create TaskFlow Account</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
       </form>
 
       {/* Switch to Login */}
-      <div className="mt-8 pt-6 border-t border-slate-800/80 text-center text-xs text-slate-400">
+      <div className="mt-6 pt-5 border-t border-slate-100 text-center text-xs text-slate-500">
         Already have an account?{' '}
-        <Link to="/login" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
-          Sign In here →
+        <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+          Sign In here
         </Link>
       </div>
     </AuthLayout>
