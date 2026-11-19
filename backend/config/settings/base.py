@@ -86,7 +86,7 @@ if IS_TESTING:
     }
 elif DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=0, ssl_require=False)
     }
 else:
     DATABASES = {
@@ -137,11 +137,14 @@ SPECTACULAR_SETTINGS = {
 
 # CORS Configuration
 DEFAULT_ALLOWED_ORIGINS = 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
-CORS_ALLOWED_ORIGINS = [
+CORS_ALLOWED_ORIGINS = list(set([
     origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS', DEFAULT_ALLOWED_ORIGINS).split(',') if origin.strip()
-]
-CSRF_TRUSTED_ORIGINS = [
+] + ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']))
+CSRF_TRUSTED_ORIGINS = list(set([
     origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', DEFAULT_ALLOWED_ORIGINS).split(',') if origin.strip()
+] + ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']))
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
