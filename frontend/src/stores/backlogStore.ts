@@ -18,6 +18,7 @@ export interface WorkItem {
   due_date: string | null;
   backlog_order: number;
   sprint_id: string | null;
+  sprint?: { id: string; name: string; status?: string } | null;
   created_at: string;
   updated_at: string;
 }

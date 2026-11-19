@@ -1,7 +1,7 @@
 # TaskFlow — System Architecture & Context Handoff Guide
 
 > **Target Audience:** Any AI model, engineer, or contributor picking up development on this repository.
-> **Last Updated:** Phase 5 (Sprint Lifecycle & Interactive Kanban Board)
+> **Last Updated:** Phase 6 (Collaboration, Discussion Threads, Attachments & Activity Trail)
 > **Single Source of Truth:** Refer to [BLUEPRINT.md](file:///c:/Users/maushmi/Desktop/DAJNGO/teampluse/BLUEPRINT.md) for full architectural specs.
 
 ---
@@ -34,13 +34,19 @@ TaskFlow/
 │   ├── apps/
 │   │   ├── accounts/          # Phase 1 & 2: CustomUser, Auth Views, JWT, Services
 │   │   ├── workspaces/        # Phase 3: Workspace, Membership, Invites, RBAC
-│   │   ├── projects/          # Phase 4 & 5: Project, Sprint, WorkItem, LexoRank, DoD, Kanban
+│   │   ├── projects/          # Phase 4 & 5: Project, Sprint, WorkItem, LexoRank, DoD, Kanban, WorkItemDependency
 │   │   │   ├── api/           # Serializers, Views (Sprint CRUD, Board, LexoRank), URLs
-│   │   │   ├── models.py      # Project, Sprint (Single Active Invariant), WorkItem (Fibonacci, keys)
-│   │   │   ├── services.py    # select_for_update atomic keys, LexoRank reorder, Sprint lifecycle & rollover
+│   │   │   ├── models.py      # Project, Sprint (Single Active Invariant), WorkItem (Fibonacci, keys), WorkItemDependency
+│   │   │   ├── services.py    # select_for_update atomic keys, LexoRank reorder, Sprint lifecycle & rollover, DFS Cycle Detection
 │   │   │   ├── selectors.py   # Scoped project, sprint, board & backlog queries
 │   │   │   ├── permissions.py # Project-level RBAC & private project isolation
 │   │   │   └── tests/         # test_projects_and_backlog (7 tests), test_sprints_and_kanban (7 tests)
+│   │   └── collaboration/     # Phase 6: Comments, Attachments, ActivityEvent Audit Trail
+│   │       ├── api/           # Serializers, Views (Comments, Attachments, Activity, Dependencies), URLs
+│   │       ├── models.py      # Comment (soft-delete), Attachment (10MB limit), ActivityEvent (polymorphic)
+│   │       ├── services.py    # add_comment, upload_attachment, soft delete, activity logging
+│   │       ├── selectors.py   # select_related scoped querysets
+│   │       └── tests/         # test_collaboration_api (8 tests)
 │   ├── config/
 │   │   ├── settings/
 │   │   │   └── base.py        # Django config, DB url, SimpleJWT, CORS
@@ -117,10 +123,21 @@ TaskFlow/
 | `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/sprints/{id}/cancel/` | Cancel sprint | Yes (Member) |
 | `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/board/` | Active sprint Kanban board | Yes (Member) |
 | `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/transition/` | Kanban card swimlane transition | Yes (Member) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/comments/` | List work item discussion comments | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/comments/` | Post new comment + record activity | Yes (Member) |
+| `PATCH` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/comments/{id}/` | Edit comment (author only) | Yes (Author) |
+| `DELETE` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/comments/{id}/` | Soft-delete comment | Yes (Author/Admin) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/attachments/` | List file attachments | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/attachments/` | Upload file (multipart, max 10MB) | Yes (Member) |
+| `DELETE` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/attachments/{id}/` | Delete attachment | Yes (Uploader/Admin) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/activity/` | Work item chronological audit trail | Yes (Member) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/dependencies/` | List work item blocker dependencies | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/dependencies/` | Add blocker (DFS cycle detected) | Yes (Member) |
+| `DELETE` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/dependencies/{id}/` | Remove blocker dependency | Yes (Member) |
 | `GET` | `/api/docs/` | Swagger OpenAPI UI | No |
 
 ---
 
 ## 5. Next Planned Work (SDLC Roadmap)
-- **Phase 6:** Collaboration & Work Item Comments (Discussion threads, file attachments, and audit trail).
 - **Phase 7:** Notifications & Background Processing (In-app alerts, Celery / Redis asynchronous tasks).
+- **Phase 8:** Real-Time Updates (WebSockets / Server-Sent Events for instant board card movement).

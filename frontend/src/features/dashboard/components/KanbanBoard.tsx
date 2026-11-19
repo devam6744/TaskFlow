@@ -25,6 +25,7 @@ import { useToast } from '../../../stores/toastStore';
 import type { WorkItem } from '../../../stores/backlogStore';
 import { CompleteSprintModal } from '../../sprints/CompleteSprintModal';
 import { CreateSprintModal } from '../../sprints/CreateSprintModal';
+import { WorkItemDetailModal } from '../../backlog/WorkItemDetailModal';
 
 export const KanbanBoard: React.FC = () => {
   const { activeWorkspace } = useWorkspaceStore();
@@ -43,6 +44,8 @@ export const KanbanBoard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyMyIssues, setOnlyMyIssues] = useState(false);
   const [draggedItemNumber, setDraggedItemNumber] = useState<number | null>(null);
+  const [selectedWorkItem, setSelectedWorkItem] = useState<WorkItem | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Fetch board data when workspace or active project changes
   useEffect(() => {
@@ -319,7 +322,14 @@ export const KanbanBoard: React.FC = () => {
                   {getPriorityBadge(item.priority)}
                 </div>
 
-                <div className="text-xs font-semibold text-slate-900 line-clamp-2">
+                <div
+                  onClick={() => {
+                    setSelectedWorkItem(item);
+                    setDetailModalOpen(true);
+                  }}
+                  className="text-xs font-semibold text-slate-900 line-clamp-2 hover:text-blue-600 transition-colors cursor-pointer"
+                  title="Click to view details, discussion & files"
+                >
                   {item.title}
                 </div>
 
@@ -382,7 +392,14 @@ export const KanbanBoard: React.FC = () => {
                   {getPriorityBadge(item.priority)}
                 </div>
 
-                <div className="text-xs font-semibold text-slate-900 line-clamp-2">
+                <div
+                  onClick={() => {
+                    setSelectedWorkItem(item);
+                    setDetailModalOpen(true);
+                  }}
+                  className="text-xs font-semibold text-slate-900 line-clamp-2 hover:text-blue-600 transition-colors cursor-pointer"
+                  title="Click to view details, discussion & files"
+                >
                   {item.title}
                 </div>
 
@@ -452,7 +469,14 @@ export const KanbanBoard: React.FC = () => {
                   {getPriorityBadge(item.priority)}
                 </div>
 
-                <div className="text-xs font-semibold text-slate-900 line-clamp-2">
+                <div
+                  onClick={() => {
+                    setSelectedWorkItem(item);
+                    setDetailModalOpen(true);
+                  }}
+                  className="text-xs font-semibold text-slate-900 line-clamp-2 hover:text-blue-600 transition-colors cursor-pointer"
+                  title="Click to view details, discussion & files"
+                >
                   {item.title}
                 </div>
 
@@ -524,7 +548,14 @@ export const KanbanBoard: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="text-xs font-semibold text-slate-500 line-through line-clamp-2">
+                <div
+                  onClick={() => {
+                    setSelectedWorkItem(item);
+                    setDetailModalOpen(true);
+                  }}
+                  className="text-xs font-semibold text-slate-500 line-through line-clamp-2 hover:text-blue-600 transition-colors cursor-pointer"
+                  title="Click to view details, discussion & files"
+                >
                   {item.title}
                 </div>
 
@@ -565,6 +596,21 @@ export const KanbanBoard: React.FC = () => {
         <CreateSprintModal
           isOpen={createSprintOpen}
           onClose={() => setCreateSprintOpen(false)}
+          workspaceSlug={activeWorkspace.slug}
+          projectSlug={activeProject.slug}
+        />
+      )}
+
+      {/* Work Item Detail & Collaboration Modal */}
+      {selectedWorkItem && activeWorkspace && activeProject && (
+        <WorkItemDetailModal
+          isOpen={detailModalOpen}
+          onClose={() => {
+            setDetailModalOpen(false);
+            setSelectedWorkItem(null);
+            fetchBoard(activeWorkspace.slug, activeProject.slug);
+          }}
+          item={selectedWorkItem}
           workspaceSlug={activeWorkspace.slug}
           projectSlug={activeProject.slug}
         />

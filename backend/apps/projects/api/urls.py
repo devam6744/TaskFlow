@@ -2,7 +2,7 @@
 Project & Backlog URLs — Phase 4
 """
 
-from django.urls import path
+from django.urls import include, path
 from apps.projects.api import views
 
 app_name = 'projects'
@@ -33,4 +33,7 @@ urlpatterns = [
     path('<slug:project_slug>/sprints/<uuid:sprint_id>/add-items/', views.SprintAddItemsView.as_view(), name='sprint-add-items'),
     path('<slug:project_slug>/sprints/<uuid:sprint_id>/remove-items/', views.SprintRemoveItemsView.as_view(), name='sprint-remove-items'),
     path('<slug:project_slug>/board/', views.ActiveSprintBoardView.as_view(), name='active-sprint-board'),
+
+    # Collaboration & Work Item Activity (Phase 6)
+    path('<slug:project_slug>/', include('apps.collaboration.api.urls')),
 ]

@@ -152,13 +152,49 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 6 — Collaboration & Work Item Comments (NEXT)
-- [ ] Implement `Comment` model (UUID PK, work_item FK, author FK, text, attachments JSON, created_at, updated_at)
-- [ ] Implement Work Item Activity Audit Log (`Activity` model: field_changed, old_value, new_value, user)
-- [ ] Attachment upload handling with file type/size validation and secure storage
-- [ ] Comment and Activity API endpoints under `/projects/{slug}/items/{item_number}/comments/`
-- [ ] Frontend Discussion Thread & Activity Feed in Work Item Drawer
-- [ ] Automated tests for comment permissions, deletion grace period, and audit trail
+## 🏁 Phase 6: Collaboration, Discussion Threads, Attachments & Activity Trail (COMPLETED ✅)
+- [x] Create modular Django app `apps/collaboration`
+- [x] Implement `Comment` model (UUID PK, `work_item` FK, `author` FK, `text`, soft deletion via `deleted_at`)
+- [x] Implement `Attachment` model (UUID PK, `work_item` FK, `uploader` FK, secure `file` storage under `media/`, `file_name`, `file_size`, `content_type`, 10MB limit)
+- [x] Implement polymorphic `ActivityEvent` model (UUID PK, `workspace` FK, `project` FK, `work_item` FK, `actor` FK, `event_type`, `description`, `metadata` JSONField)
+- [x] Implement `WorkItemDependency` model in `apps/projects` (`blocking_item`, `blocked_item`, `dependency_type='BLOCKS'`, unique together constraint)
+- [x] Apply migrations to live Supabase PostgreSQL 17 (`projects.0003_workitemdependency`, `collaboration.0001_initial`)
+- [x] Implement Service Layer in `apps/collaboration/services.py`:
+  - `add_comment`, `update_comment`, `delete_comment` (soft delete with author ownership check)
+  - `upload_attachment` (10MB limit validation, MIME detection, activity logging)
+  - `delete_attachment` (physical file removal and audit logging)
+  - `record_activity_event` (atomic audit trail helper)
+- [x] Implement Graph Cycle Detection (DFS) in `apps/projects/services.py` (`check_dependency_cycle`) to prevent deadlock loops
+- [x] Connect `record_activity_event` to status transitions and sprint assignments in `apps/projects/services.py`
+- [x] Implement Selectors (`apps/collaboration/selectors.py`) with `select_related('author')`, `select_related('uploader')`, `select_related('actor')` to prevent N+1 queries
+- [x] Implement DRF Serializers and Views with dual `/items/` and `/work-items/` URL patterns
+- [x] Automated test suite (`apps/collaboration/tests/test_collaboration_api.py`) — 8/8 tests passing (full test suite: 41/41 passing)
+- [x] OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors, 0 warnings)
+- [x] Frontend Executive Light-Theme Collaboration Dual-Pane Modal:
+  - Responsive dual-pane layout (`flex flex-col md:flex-row`)
+  - Left pane: Item properties, description, DoD acceptance criteria, Fibonacci point selector, and Blocked By dependency manager
+  - Right pane: 3 interactive tabs:
+    - **Comments Tab**: Real-time discussion thread, author avatar badges, relative timestamps, inline delete, Ctrl+Enter submit
+    - **Activity Tab**: Chronological audit trail of comments, attachments, status changes, and sprint assignments
+    - **Files Tab**: Drag-and-drop file upload zone (Max 10MB), file badges with icons, download and delete buttons
+  - Connected Kanban cards to open collaboration modal on click
+  - Interactive SDLC Roadmap badges in dashboard navigation
+  - Reactive Zustand collaboration store (`stores/collaborationStore.ts`)
+  - Verified frontend production build (`npm run build` in 2.87s)
+- [x] Comprehensive documentation:
+  - `docs/learning/phase-6_collaboration_concepts.md` (Soft deletion, DAG cycle detection, MIME sniffing protection, audit trails in Hinglish)
+  - `docs/decisions/phase-6_decisions.md` (ADRs 019-022)
+  - `docs/phase-reports/phase-6_completion.md`
+
+---
+
+## 🚀 Active Milestone: Phase 7 — Notifications & Background Processing (NEXT)
+- [ ] Implement `apps/notifications` app and `Notification` model (UUID PK, recipient FK, actor FK, event_type, target_url, read_at)
+- [ ] Implement Notification preferences & digest options
+- [ ] Celery / Background task queue integration for async dispatch
+- [ ] In-app notification bell icon with badge count & dropdown list in header
+- [ ] Mark as read / mark all as read API endpoints
+- [ ] Email dispatch service stub with transactional templates
 
 
 ---

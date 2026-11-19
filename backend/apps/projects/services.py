@@ -549,6 +549,25 @@ def add_work_items_to_sprint(
             item.status = WorkItem.Status.TODO
         item.save()
 
+        # Emit sprint assignment activity
+        try:
+            from apps.collaboration.services import record_activity_event
+            record_activity_event(
+                workspace=sprint.project.workspace,
+                actor=user,
+                object_type='WorkItem',
+                object_id=item.id,
+                event_type='SPRINT_ASSIGNED',
+                metadata={
+                    'sprint_id': str(sprint.id),
+                    'sprint_name': sprint.name,
+                    'item_number': item.item_number,
+                    'key_identifier': item.key_identifier,
+                }
+            )
+        except Exception:
+            pass
+
     return items
 
 
@@ -592,6 +611,128 @@ def transition_work_item_status(
     if not item:
         raise ValidationError("Work item not found.")
 
-    item.status = new_status
-    item.save(update_fields=['status', 'updated_at'])
+    old_status = item.status
+    if old_status != new_status:
+        item.status = new_status
+        item.save(update_fields=['status', 'updated_at'])
+
+        try:
+            from apps.collaboration.services import record_activity_event
+            record_activity_event(
+                workspace=project.workspace,
+                actor=user,
+                object_type='WorkItem',
+                object_id=item.id,
+                event_type='STATUS_CHANGED',
+                metadata={
+                    'old_status': old_status,
+                    'new_status': new_status,
+                    'item_number': item.item_number,
+                    'key_identifier': item.key_identifier,
+                }
+            )
+        except Exception:
+            pass
+
     return item
+
+
+def check_dependency_cycle(blocking_item_id, target_blocked_id) -> bool:
+    """
+    Checks if making blocking_item block target_blocked would create a circular dependency.
+    Traverses: target_blocked -> ... -> blocking_item
+    """
+    from apps.projects.models import WorkItemDependency
+    visited = set()
+    queue = [target_blocked_id]
+
+    while queue:
+        current_id = queue.pop(0)
+        if current_id == blocking_item_id:
+            return True
+        if current_id in visited:
+            continue
+        visited.add(current_id)
+        blocked_ids = WorkItemDependency.objects.filter(
+            blocking_item_id=current_id
+        ).values_list('blocked_item_id', flat=True)
+        for b_id in blocked_ids:
+            if b_id not in visited:
+                queue.append(b_id)
+
+    return False
+
+
+@transaction.atomic
+def add_work_item_dependency(
+    *,
+    user,
+    project: Project,
+    blocking_item: WorkItem,
+    blocked_item: WorkItem,
+    dependency_type: str = 'BLOCKS'
+):
+    """
+    Adds a dependency relationship (blocking_item blocks blocked_item).
+    Enforces cycle detection so circular blockers are rejected.
+    """
+    if not has_project_write_access(project, user):
+        raise PermissionDenied("You do not have write permission for this project.")
+
+    if blocking_item.id == blocked_item.id:
+        raise ValidationError({'detail': 'A work item cannot block itself.'})
+
+    if blocking_item.project_id != blocked_item.project_id:
+        raise ValidationError({'detail': 'Dependencies can only be created between items in the same project.'})
+
+    from apps.projects.models import WorkItemDependency
+    existing = WorkItemDependency.objects.filter(
+        blocking_item=blocking_item, blocked_item=blocked_item
+    ).first()
+    if existing:
+        return existing
+
+    # Cycle Detection: Does blocked_item already block blocking_item?
+    if check_dependency_cycle(blocking_item.id, blocked_item.id):
+        raise ValidationError({'detail': 'Circular dependency detected: This item is already blocked by the target item.'})
+
+    dep = WorkItemDependency.objects.create(
+        blocking_item=blocking_item,
+        blocked_item=blocked_item,
+        dependency_type=dependency_type
+    )
+
+    try:
+        from apps.collaboration.services import record_activity_event
+        record_activity_event(
+            workspace=project.workspace,
+            actor=user,
+            object_type='WorkItem',
+            object_id=blocked_item.id,
+            event_type='DEPENDENCY_ADDED',
+            metadata={
+                'dependency_id': str(dep.id),
+                'blocking_key': blocking_item.key_identifier,
+                'blocked_key': blocked_item.key_identifier,
+                'blocking_title': blocking_item.title,
+            }
+        )
+    except Exception:
+        pass
+
+    return dep
+
+
+@transaction.atomic
+def remove_work_item_dependency(*, user, project: Project, dependency_id: str):
+    """Removes a dependency relationship."""
+    if not has_project_write_access(project, user):
+        raise PermissionDenied("You do not have write permission for this project.")
+
+    from apps.projects.models import WorkItemDependency
+    dep = WorkItemDependency.objects.filter(id=dependency_id).first()
+    if not dep:
+        raise ValidationError({'detail': 'Dependency not found.'})
+
+    dep.delete()
+

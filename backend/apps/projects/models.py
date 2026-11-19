@@ -427,3 +427,40 @@ class WorkItem(models.Model):
             raise ValidationError({
                 'story_points': f'Story points must be one of {FIBONACCI_STORY_POINTS}.'
             })
+
+
+class WorkItemDependency(models.Model):
+    """
+    Dependency relationship between two WorkItems.
+    e.g., 'blocking_item' blocks 'blocked_item'.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    blocking_item = models.ForeignKey(
+        WorkItem,
+        on_delete=models.CASCADE,
+        related_name='blocking_dependencies',
+        help_text="The item that is blocking progress"
+    )
+    blocked_item = models.ForeignKey(
+        WorkItem,
+        on_delete=models.CASCADE,
+        related_name='blocked_dependencies',
+        help_text="The item that cannot be completed until blocking_item is done"
+    )
+    dependency_type = models.CharField(max_length=20, default='BLOCKS')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'projects_workitemdependency'
+        unique_together = [('blocking_item', 'blocked_item')]
+        verbose_name = 'Work Item Dependency'
+        verbose_name_plural = 'Work Item Dependencies'
+
+    def clean(self):
+        super().clean()
+        if self.blocking_item_id == self.blocked_item_id:
+            raise ValidationError("A work item cannot block itself.")
+
+    def __str__(self) -> str:
+        return f"{self.blocking_item.key_identifier} blocks {self.blocked_item.key_identifier}"
+

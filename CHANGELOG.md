@@ -5,6 +5,53 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-11-19 - Phase 6: Collaboration, Discussion Threads, Attachments & Activity Trail
+### Added
+- Enterprise Collaboration modular app: `apps.collaboration`.
+- Data models:
+  - `Comment`: Soft-delete discussion model (`deleted_at`), UUID PK, `work_item` FK, `author` FK, `text`, timestamps.
+  - `Attachment`: 10MB upload model, UUID PK, `work_item` FK, `uploader` FK, `file`, `file_name`, `file_size`, `content_type`.
+  - `ActivityEvent`: Polymorphic audit log, UUID PK, `workspace` FK, `project` FK, `work_item` FK, `actor` FK, `event_type`, `description`, `metadata` JSONField.
+  - `WorkItemDependency`: Directed graph dependency model in `apps.projects` (`blocking_item`, `blocked_item`, `dependency_type='BLOCKS'`).
+- Applied database migrations to live Supabase PostgreSQL 17:
+  - `apps/projects/migrations/0003_workitemdependency.py`
+  - `apps/collaboration/migrations/0001_initial.py`
+- Service Layer (`apps.collaboration.services` & `apps.projects.services`):
+  - `add_comment`: Discussion posting with automatic audit trail recording.
+  - `update_comment`: Author ownership enforcement and edit tracking.
+  - `delete_comment`: Non-destructive soft deletion (`deleted_at = timezone.now()`) preserving audit log history.
+  - `upload_attachment`: 10MB file limit validation and file metadata persistence.
+  - `delete_attachment`: Physical file deletion and activity logging.
+  - `check_dependency_cycle`: Depth-First Search (DFS) graph cycle detector to prevent circular dependencies (deadlocks).
+  - `add_work_item_dependency` & `remove_work_item_dependency`: Validated dependency management.
+  - `record_activity_event`: Centralized polymorphic audit log generator connected to status transitions, sprint assignments, comments, and attachments.
+- Query Selectors (`apps.collaboration.selectors`): Scoped with `select_related('author')`, `select_related('uploader')`, `select_related('actor')` to prevent N+1 queries.
+- REST API Endpoints mounted under `/api/v1/workspaces/{workspace_slug}/projects/{project_slug}/`:
+  - `GET /items/{item_number}/comments/` & `POST /items/{item_number}/comments/`
+  - `PATCH /items/{item_number}/comments/{id}/` & `DELETE /items/{item_number}/comments/{id}/`
+  - `GET /items/{item_number}/attachments/` & `POST /items/{item_number}/attachments/` (Multipart file upload)
+  - `DELETE /items/{item_number}/attachments/{id}/`
+  - `GET /items/{item_number}/activity/` (Full audit timeline)
+  - `GET /items/{item_number}/dependencies/` & `POST /items/{item_number}/dependencies/`
+  - `DELETE /items/{item_number}/dependencies/{id}/`
+- Automated Unit Tests (`apps/collaboration/tests/test_collaboration_api.py`): 8/8 tests passing (Full suite: 41/41 passing).
+- OpenAPI 3.0: Validated with `drf-spectacular` (0 errors, 0 warnings).
+- Frontend Executive Dual-Pane Collaboration Modal:
+  - Responsive dual-pane layout (`flex flex-col md:flex-row`) optimized for all viewports.
+  - Left pane: Item properties, description, DoD acceptance criteria, Fibonacci point selector, and Blocked By dependency manager.
+  - Right pane: 3 interactive tabs:
+    - **Comments Tab**: Real-time discussion thread, author avatar badges, relative timestamps, inline delete, Ctrl+Enter submit.
+    - **Activity Tab**: Chronological audit trail of comments, attachments, status changes, and sprint assignments.
+    - **Files Tab**: Drag-and-drop file upload zone (Max 10MB), file badges with icons, download and delete buttons.
+  - Connected Kanban cards to open collaboration modal on click.
+  - Interactive SDLC Roadmap badges in dashboard navigation.
+  - Reactive Zustand collaboration store (`stores/collaborationStore.ts`).
+  - Verified production build (`npm run build` in 2.87s).
+- Comprehensive Phase 6 documentation:
+  - `docs/learning/phase-6_collaboration_concepts.md` (Soft deletion, DAG cycle detection, MIME sniffing protection, audit trails in Hinglish).
+  - `docs/decisions/phase-6_decisions.md` (ADRs 019-022).
+  - `docs/phase-reports/phase-6_completion.md`.
+
 ## [0.5.0] - 2026-11-19 - Phase 5: Sprint Lifecycle & Interactive Kanban Board
 ### Added
 - Enterprise Sprint Lifecycle data model: `Sprint` in `apps.projects`:
