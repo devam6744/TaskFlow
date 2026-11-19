@@ -5,6 +5,39 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-11-19 - Phase 3: Workspaces & Multi-Tenancy Isolation
+### Added
+- Enterprise Multi-Tenancy modular app: `apps.workspaces`.
+- Data models:
+  - `Workspace`: UUID PK, name, unique URL slug, owner FK, JSONField settings, `archived_at` soft-delete timestamp.
+  - `WorkspaceMember`: UUID PK, workspace FK, user FK, RBAC role choices (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`), unique together `(workspace, user)`.
+  - `WorkspaceInvite`: UUID PK, email, role, SHA-256 token hash storage, 7-day expiration.
+- Database migration `workspaces.0001_initial` applied to Supabase PostgreSQL 17.
+- Service layer (`apps.workspaces.services`):
+  - `create_workspace` (atomic transaction, auto-assigns creator as OWNER).
+  - `invite_member` (cryptographic token generator, SHA-256 hash storage).
+  - `accept_invite` (single-use validation, atomic join).
+  - `remove_member` (last active owner protection).
+  - `update_member_role` (anti-self-escalation guard).
+  - `archive_workspace` & `unarchive_workspace` (soft-delete lifecycle).
+- Optimized selectors with `select_related('user')` and `select_related('owner')` to eliminate N+1 queries.
+- Granular DRF RBAC permission classes (`IsWorkspaceMember`, `IsWorkspaceAdminOrOwner`, `IsWorkspaceOwner`).
+- 12 REST API endpoints under `/api/v1/workspaces/`.
+- Automated test suite with 11 tests verifying multi-tenancy isolation and RBAC constraints (full test suite: 19/19 passing).
+- Frontend Executive UI & Workspaces features:
+  - Fixed scroll overlap bug: container structured as `h-screen overflow-hidden` with fixed elevated `<header>` (`z-30`) and scrollable `<main>` area (`overflow-y-auto`). Header never gets overlapped during scroll.
+  - Working global `Ctrl+K` / `Cmd+K` keyboard shortcut and command palette `QuickSearchModal.tsx`.
+  - Workspace Switcher dropdown in header and sidebar with role badges (`WorkspaceSwitcher.tsx`).
+  - Workspace Creation Modal with real-time slug preview (`CreateWorkspaceModal.tsx`).
+  - Workspace Members Modal with role badges, invite creation form, copyable invite link, and member management (`WorkspaceMembersModal.tsx`).
+  - Dedicated `/join?token=...` invitation acceptance page (`JoinWorkspacePage.tsx`).
+  - Reactive Zustand workspace store (`stores/workspaceStore.ts`).
+  - Verified frontend production build (`npm run build` in 1.61s).
+- Comprehensive Phase 3 documentation:
+  - `docs/learning/phase-3_workspace_concepts.md` (Multi-Tenancy, RBAC, SHA-256 tokens, N+1 prevention in clear Hinglish).
+  - `docs/decisions/phase-3_decisions.md` (ADRs 006-010).
+  - `docs/phase-reports/phase-3_completion.md`.
+
 ## [0.2.0] - 2026-11-18 - Phase 1 & 2: Custom User Model & Authentication
 ### Added
 - Enterprise `CustomUser` model inheriting `AbstractBaseUser` and `PermissionsMixin` with UUIDv4 primary keys and normalized email.

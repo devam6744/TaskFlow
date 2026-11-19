@@ -45,18 +45,51 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 3 — Workspace & Multi-Tenancy Isolation (NEXT)
-- [ ] Implement `Workspace` and `WorkspaceMember` models (UUID PKs, slug, role choices: ADMIN, MEMBER, VIEWER)
-- [ ] Implement Workspace multi-tenancy middleware / permission classes
-- [ ] Service layer: `create_workspace`, `invite_member`, `accept_invite`
-- [ ] Workspace API endpoints (`/api/v1/workspaces/`)
-- [ ] Tenant data isolation tests (ensure User A cannot see User B's workspace)
-- [ ] Frontend Workspace switcher & creation modal
+## 🏁 Phase 3: Workspace & Multi-Tenancy Isolation (COMPLETED ✅)
+- [x] Create modular Django app `apps/workspaces`
+- [x] Implement `Workspace`, `WorkspaceMember`, and `WorkspaceInvite` models (UUID PKs, unique slug, role choices: OWNER, ADMIN, MEMBER, VIEWER)
+- [x] Enforce composite unique constraint `(workspace, user)` on `WorkspaceMember`
+- [x] Apply migrations to live Supabase PostgreSQL 17 (`workspaces.0001_initial`)
+- [x] Implement multi-tenancy permission classes (`IsWorkspaceMember`, `IsWorkspaceAdminOrOwner`, `IsWorkspaceOwner`)
+- [x] Implement Service layer (`apps/workspaces/services.py`):
+  - `create_workspace` (atomic transaction, auto-enrolls creator as OWNER)
+  - `invite_member` (cryptographic token generator, SHA-256 token hash storage, 7-day expiration)
+  - `accept_invite` (single-use validation, joins workspace with assigned role)
+  - `remove_member` (guarantees last active owner cannot be removed)
+  - `update_member_role` (anti-self-escalation guard)
+  - `archive_workspace` & `unarchive_workspace` (soft-delete lifecycle)
+- [x] Implement Query Selectors (`selectors.py`) with `select_related('user')` and `select_related('owner')` to eliminate N+1 queries
+- [x] Implement REST API endpoints (`/api/v1/workspaces/` collection, scoped detail, members, invites, and accept)
+- [x] Automated test suite (`apps/workspaces/tests/test_workspace_api.py`) — 11/11 tests passing (19/19 full suite passing)
+- [x] OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors, 0 warnings)
+- [x] Frontend Executive UI & Workspaces:
+  - Fixed scroll overlap bug: layout updated to `h-screen overflow-hidden` with fixed elevated `<header>` (`z-30`) and independent scrollable canvas (`overflow-y-auto`)
+  - Functional global `Ctrl+K` / `Cmd+K` keyboard shortcut listener and interactive `QuickSearchModal.tsx` command palette
+  - Workspace Switcher dropdown in header/sidebar with role badges (`WorkspaceSwitcher.tsx`)
+  - Create Workspace Modal with real-time slug preview (`CreateWorkspaceModal.tsx`)
+  - Workspace Members Modal with role badges, invite creation form, copyable invite link, and member management (`WorkspaceMembersModal.tsx`)
+  - Dedicated `/join?token=...` invitation acceptance page (`JoinWorkspacePage.tsx`)
+  - Reactive Zustand workspace store (`stores/workspaceStore.ts`)
+  - Verified frontend production build (`npm run build` in 1.61s)
+- [x] Comprehensive documentation:
+  - `docs/learning/phase-3_workspace_concepts.md` (Multi-Tenancy, RBAC, SHA-256 tokens, N+1 query prevention in clear Hinglish)
+  - `docs/decisions/phase-3_decisions.md` (ADRs 006-010)
+  - `docs/phase-reports/phase-3_completion.md`
+
+---
+
+## 🚀 Active Milestone: Phase 4 — Projects & Product Backlog (NEXT)
+- [ ] Implement `Project` model (UUID PK, workspace FK, name, description, status, visibility, dates, definition_of_done)
+- [ ] Implement `ProjectMembership` model for private project access control
+- [ ] Implement Product Backlog models (`WorkItem` baseline, types: Story, Task, Bug, Improvement)
+- [ ] Service layer: `create_project`, `archive_project`, `assign_project_member`
+- [ ] Project API endpoints (`/api/v1/workspaces/{slug}/projects/`)
+- [ ] Automated tests for project workspace-scoping and visibility
+- [ ] Frontend Projects list, create modal, and project view
 
 ---
 
 ## 📅 Upcoming Phases
-- **Phase 3: Workspace & Multi-Tenancy Isolation**
 - **Phase 4: Projects & Product Backlog**
 - **Phase 5: Sprint Lifecycle & Kanban Board**
 - **Phase 6: Collaboration & Attachments**

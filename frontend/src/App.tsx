@@ -3,6 +3,7 @@ import { LandingPage } from './features/landing/LandingPage';
 import { AuthPage } from './features/auth/AuthPage';
 import { ProtectedRoute } from './features/auth/ProtectedRoute';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { JoinWorkspacePage } from './features/workspaces/JoinWorkspacePage';
 import { ToastContainer } from './components/ui/ToastContainer';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthPage initialMode="login" />} />
         <Route path="/register" element={<AuthPage initialMode="register" />} />
+        <Route path="/join" element={<JoinWorkspacePage />} />
         <Route
           path="/dashboard"
           element={
