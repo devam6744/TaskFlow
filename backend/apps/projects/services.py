@@ -15,6 +15,7 @@ from apps.projects.models import (
     Project,
     ProjectMember,
     WorkItem,
+    Sprint,
     FIBONACCI_STORY_POINTS,
 )
 
@@ -368,3 +369,229 @@ def delete_work_item(work_item: WorkItem, user) -> None:
         raise PermissionDenied("You do not have permission to delete this work item.")
 
     work_item.delete()
+
+
+# -------------------------------------------------------------------------
+# Sprint Lifecycle Services — Phase 5: Sprints & Interactive Kanban
+# -------------------------------------------------------------------------
+
+@transaction.atomic
+def create_sprint(
+    *,
+    project: Project,
+    user,
+    name: str,
+    sprint_goal: str = '',
+    start_date=None,
+    end_date=None
+) -> Sprint:
+    """Create a new sprint in PLANNING status."""
+    if not has_project_write_access(project, user):
+        raise PermissionDenied("You do not have write permission for this project.")
+
+    if not name or not name.strip():
+        raise ValidationError({"name": "Sprint name is required."})
+
+    if start_date and end_date and end_date <= start_date:
+        raise ValidationError({"end_date": "End date must be strictly after start date."})
+
+    sprint = Sprint.objects.create(
+        project=project,
+        name=name.strip(),
+        sprint_goal=sprint_goal.strip() if sprint_goal else '',
+        start_date=start_date,
+        end_date=end_date,
+        status=Sprint.Status.PLANNING,
+        created_by=user,
+    )
+    return sprint
+
+
+@transaction.atomic
+def start_sprint(
+    *,
+    sprint: Sprint,
+    user,
+    sprint_goal: str | None = None,
+    start_date=None,
+    end_date=None
+) -> Sprint:
+    """
+    Start an existing sprint.
+    Enforces the single ACTIVE sprint invariant via row-level pessimistic locking on Project.
+    """
+    if not has_project_write_access(sprint.project, user):
+        raise PermissionDenied("You do not have permission to start a sprint in this project.")
+
+    if sprint.status != Sprint.Status.PLANNING:
+        raise ValidationError(f"Only sprints in PLANNING status can be started. Current status is {sprint.status}.")
+
+    # Pessimistic locking on project to prevent concurrent starts
+    project = Project.objects.select_for_update().get(id=sprint.project_id)
+
+    # Invariant: No other ACTIVE sprint in this project
+    active_exists = Sprint.objects.filter(
+        project=project,
+        status=Sprint.Status.ACTIVE
+    ).exclude(id=sprint.id).exists()
+
+    if active_exists:
+        raise ValidationError("Another sprint is already active in this project. Complete it before starting a new sprint.")
+
+    if sprint_goal is not None:
+        sprint.sprint_goal = sprint_goal.strip()
+    if start_date is not None:
+        sprint.start_date = start_date
+    if end_date is not None:
+        sprint.end_date = end_date
+
+    if not sprint.sprint_goal or not sprint.sprint_goal.strip():
+        raise ValidationError({"sprint_goal": "A Sprint Goal is required to start the sprint."})
+
+    if sprint.start_date and sprint.end_date and sprint.end_date <= sprint.start_date:
+        raise ValidationError({"end_date": "End date must be strictly after start date."})
+
+    # Calculate committed planned story points
+    planned_points = sum(
+        item.story_points or 0 for item in sprint.work_items.all()
+    )
+
+    sprint.status = Sprint.Status.ACTIVE
+    sprint.actual_started_at = timezone.now()
+    sprint.planned_story_points = planned_points
+    sprint.save()
+
+    # Move items currently in BACKLOG to TODO for active sprint execution
+    sprint.work_items.filter(status=WorkItem.Status.BACKLOG).update(status=WorkItem.Status.TODO)
+
+    return sprint
+
+
+@transaction.atomic
+def complete_sprint(
+    *,
+    sprint: Sprint,
+    user,
+    rollover_to_backlog: bool = True,
+    next_sprint_id: str | None = None
+) -> Sprint:
+    """
+    Complete an ACTIVE sprint.
+    Records completed points and handles rollover of incomplete items.
+    """
+    if not has_project_write_access(sprint.project, user):
+        raise PermissionDenied("You do not have permission to complete this sprint.")
+
+    if sprint.status != Sprint.Status.ACTIVE:
+        raise ValidationError(f"Only ACTIVE sprints can be completed. Current status is {sprint.status}.")
+
+    # Tally completed story points
+    completed_points = sum(
+        item.story_points or 0 for item in sprint.work_items.filter(status=WorkItem.Status.DONE)
+    )
+
+    # Handle incomplete work items (anything not DONE)
+    incomplete_items = sprint.work_items.exclude(status=WorkItem.Status.DONE)
+
+    if next_sprint_id:
+        target_sprint = Sprint.objects.filter(
+            project=sprint.project,
+            id=next_sprint_id,
+            status=Sprint.Status.PLANNING
+        ).first()
+        if not target_sprint:
+            raise ValidationError("Target sprint for rollover must be in PLANNING status within the same project.")
+        incomplete_items.update(sprint=target_sprint)
+    elif rollover_to_backlog:
+        incomplete_items.update(sprint=None, status=WorkItem.Status.BACKLOG)
+
+    sprint.status = Sprint.Status.COMPLETED
+    sprint.completed_story_points = completed_points
+    sprint.actual_completed_at = timezone.now()
+    sprint.save()
+    return sprint
+
+
+@transaction.atomic
+def cancel_sprint(*, sprint: Sprint, user) -> Sprint:
+    """Cancel a sprint and return all its items to the backlog."""
+    if not has_project_write_access(sprint.project, user):
+        raise PermissionDenied("You do not have permission to cancel this sprint.")
+
+    if sprint.status in [Sprint.Status.COMPLETED, Sprint.Status.CANCELLED]:
+        raise ValidationError(f"Sprint cannot be cancelled from status {sprint.status}.")
+
+    # Revert all items to backlog
+    sprint.work_items.all().update(sprint=None)
+    sprint.status = Sprint.Status.CANCELLED
+    sprint.save()
+    return sprint
+
+
+@transaction.atomic
+def add_work_items_to_sprint(
+    *,
+    sprint: Sprint,
+    user,
+    item_numbers: list[int]
+) -> list[WorkItem]:
+    """Assign backlog items to a sprint."""
+    if not has_project_write_access(sprint.project, user):
+        raise PermissionDenied("You do not have write permission for this project.")
+
+    if sprint.status not in [Sprint.Status.PLANNING, Sprint.Status.ACTIVE]:
+        raise ValidationError("Items can only be added to sprints in PLANNING or ACTIVE status.")
+
+    items = list(WorkItem.objects.filter(project=sprint.project, item_number__in=item_numbers))
+    for item in items:
+        item.sprint = sprint
+        if sprint.status == Sprint.Status.ACTIVE and item.status == WorkItem.Status.BACKLOG:
+            item.status = WorkItem.Status.TODO
+        item.save()
+
+    return items
+
+
+@transaction.atomic
+def remove_work_items_from_sprint(
+    *,
+    project: Project,
+    user,
+    item_numbers: list[int]
+) -> list[WorkItem]:
+    """Remove items from sprint and return them to the product backlog."""
+    if not has_project_write_access(project, user):
+        raise PermissionDenied("You do not have write permission for this project.")
+
+    items = list(WorkItem.objects.filter(project=project, item_number__in=item_numbers))
+    for item in items:
+        item.sprint = None
+        if item.status == WorkItem.Status.TODO:
+            item.status = WorkItem.Status.BACKLOG
+        item.save()
+
+    return items
+
+
+@transaction.atomic
+def transition_work_item_status(
+    *,
+    project: Project,
+    user,
+    item_number: int,
+    new_status: str
+) -> WorkItem:
+    """Move a work item between Kanban columns (TODO -> IN_PROGRESS -> IN_REVIEW -> DONE)."""
+    if not has_project_write_access(project, user):
+        raise PermissionDenied("You do not have write permission for this project.")
+
+    if new_status not in WorkItem.Status.values:
+        raise ValidationError({"status": f"Invalid status: {new_status}. Must be one of {WorkItem.Status.values}"})
+
+    item = WorkItem.objects.filter(project=project, item_number=item_number).first()
+    if not item:
+        raise ValidationError("Work item not found.")
+
+    item.status = new_status
+    item.save(update_fields=['status', 'updated_at'])
+    return item

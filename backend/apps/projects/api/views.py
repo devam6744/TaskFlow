@@ -11,7 +11,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse
 from django.contrib.auth import get_user_model
 
 from apps.workspaces.models import Workspace
-from apps.projects.models import Project, ProjectMember, WorkItem
+from apps.projects.models import Project, ProjectMember, WorkItem, Sprint
 from apps.projects import services, selectors
 from apps.projects.api.serializers import (
     ProjectSerializer,
@@ -23,6 +23,12 @@ from apps.projects.api.serializers import (
     WorkItemCreateSerializer,
     WorkItemUpdateSerializer,
     WorkItemReorderSerializer,
+    SprintSerializer,
+    SprintCreateSerializer,
+    SprintStartSerializer,
+    SprintCompleteSerializer,
+    SprintItemsActionSerializer,
+    WorkItemStatusTransitionSerializer,
 )
 
 User = get_user_model()
@@ -356,3 +362,326 @@ class WorkItemReorderView(BaseWorkspaceProjectView):
             next_item_id=serializer.validated_data.get('next_item_id')
         )
         return Response(WorkItemSerializer(reordered).data, status=status.HTTP_200_OK)
+
+
+# -------------------------------------------------------------------------
+# Sprint Lifecycle Views — Phase 5: Sprints & Interactive Kanban Board
+# -------------------------------------------------------------------------
+
+class SprintListCreateView(BaseWorkspaceProjectView):
+    """
+    GET  /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/ - List project sprints
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/ - Create a new sprint
+    """
+
+    @extend_schema(
+        summary="List all sprints in project",
+        responses={200: SprintSerializer(many=True)},
+    )
+    def get(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        sprints = selectors.get_project_sprints(project)
+        return Response(SprintSerializer(sprints, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Create a new sprint",
+        request=SprintCreateSerializer,
+        responses={201: SprintSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        serializer = SprintCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        sprint = services.create_sprint(
+            project=project,
+            user=request.user,
+            name=data['name'],
+            sprint_goal=data.get('sprint_goal', ''),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+        )
+        return Response(SprintSerializer(sprint).data, status=status.HTTP_201_CREATED)
+
+
+class SprintDetailView(BaseWorkspaceProjectView):
+    """
+    GET   /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/
+    PATCH /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/
+    """
+
+    def get_sprint(self, project: Project, sprint_id: str) -> Sprint:
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound(f"Sprint '{sprint_id}' not found.")
+        return sprint
+
+    @extend_schema(
+        summary="Get sprint details and items",
+        responses={200: SprintSerializer},
+    )
+    def get(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        sprint = self.get_sprint(project, sprint_id)
+        items = selectors.get_sprint_work_items(sprint)
+
+        sprint_data = SprintSerializer(sprint).data
+        sprint_data['items'] = WorkItemSerializer(items, many=True).data
+        return Response(sprint_data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Update sprint details",
+        request=SprintCreateSerializer,
+        responses={200: SprintSerializer},
+    )
+    def patch(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        sprint = self.get_sprint(project, sprint_id)
+
+        if not services.has_project_write_access(project, request.user):
+            raise PermissionDenied("You do not have write permission for this project.")
+
+        for field in ['name', 'sprint_goal', 'start_date', 'end_date']:
+            if field in request.data:
+                setattr(sprint, field, request.data[field])
+
+        sprint.save()
+        return Response(SprintSerializer(sprint).data, status=status.HTTP_200_OK)
+
+
+class SprintStartView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/start/
+    Activates the sprint, enforcing the single ACTIVE sprint invariant.
+    """
+
+    @extend_schema(
+        summary="Start/Activate a Sprint",
+        request=SprintStartSerializer,
+        responses={200: SprintSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound("Sprint not found.")
+
+        serializer = SprintStartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        started_sprint = services.start_sprint(
+            sprint=sprint,
+            user=request.user,
+            sprint_goal=data.get('sprint_goal'),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+        )
+        return Response(SprintSerializer(started_sprint).data, status=status.HTTP_200_OK)
+
+
+class SprintCompleteView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/complete/
+    Completes the active sprint and rolls over incomplete work.
+    """
+
+    @extend_schema(
+        summary="Complete an Active Sprint",
+        request=SprintCompleteSerializer,
+        responses={200: SprintSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound("Sprint not found.")
+
+        serializer = SprintCompleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        completed = services.complete_sprint(
+            sprint=sprint,
+            user=request.user,
+            rollover_to_backlog=data.get('rollover_to_backlog', True),
+            next_sprint_id=data.get('next_sprint_id'),
+        )
+        return Response(SprintSerializer(completed).data, status=status.HTTP_200_OK)
+
+
+class SprintCancelView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/cancel/
+    Cancels a sprint and returns all items to the product backlog.
+    """
+
+    @extend_schema(
+        summary="Cancel a Sprint",
+        request=None,
+        responses={200: SprintSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound("Sprint not found.")
+
+        cancelled = services.cancel_sprint(sprint=sprint, user=request.user)
+        return Response(SprintSerializer(cancelled).data, status=status.HTTP_200_OK)
+
+
+class SprintAddItemsView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/add-items/
+    Adds work items to a sprint.
+    """
+
+    @extend_schema(
+        summary="Add work items to a sprint",
+        request=SprintItemsActionSerializer,
+        responses={200: WorkItemSerializer(many=True)},
+    )
+    def post(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound("Sprint not found.")
+
+        serializer = SprintItemsActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        items = services.add_work_items_to_sprint(
+            sprint=sprint,
+            user=request.user,
+            item_numbers=serializer.validated_data['item_numbers'],
+        )
+        return Response(WorkItemSerializer(items, many=True).data, status=status.HTTP_200_OK)
+
+
+class SprintRemoveItemsView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/remove-items/
+    Removes work items from a sprint back to the product backlog.
+    """
+
+    @extend_schema(
+        summary="Remove work items from a sprint",
+        request=SprintItemsActionSerializer,
+        responses={200: WorkItemSerializer(many=True)},
+    )
+    def post(self, request, workspace_slug, project_slug, sprint_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        serializer = SprintItemsActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        items = services.remove_work_items_from_sprint(
+            project=project,
+            user=request.user,
+            item_numbers=serializer.validated_data['item_numbers'],
+        )
+        return Response(WorkItemSerializer(items, many=True).data, status=status.HTTP_200_OK)
+
+
+class ActiveSprintBoardView(BaseWorkspaceProjectView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/board/
+    Returns the active sprint data and its work items grouped into swimlane columns.
+    """
+
+    @extend_schema(
+        summary="Get Active Sprint Kanban Board data",
+        responses={200: OpenApiResponse(description="Board data with swimlane columns")},
+    )
+    def get(self, request, workspace_slug, project_slug):
+        from django.utils import timezone
+
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        active_sprint = selectors.get_active_sprint(project)
+
+        if not active_sprint:
+            return Response({
+                'active_sprint': None,
+                'days_remaining': 0,
+                'columns': {
+                    'TODO': [],
+                    'IN_PROGRESS': [],
+                    'IN_REVIEW': [],
+                    'DONE': [],
+                }
+            }, status=status.HTTP_200_OK)
+
+        items = selectors.get_sprint_work_items(active_sprint)
+        serialized_items = WorkItemSerializer(items, many=True).data
+
+        columns = {
+            'TODO': [],
+            'IN_PROGRESS': [],
+            'IN_REVIEW': [],
+            'DONE': [],
+        }
+
+        for item in serialized_items:
+            item_status = item.get('status')
+            if item_status in columns:
+                columns[item_status].append(item)
+            else:
+                # Default fallback
+                columns['TODO'].append(item)
+
+        days_remaining = 0
+        if active_sprint.end_date:
+            delta = (active_sprint.end_date - timezone.now().date()).days
+            days_remaining = max(0, delta)
+
+        return Response({
+            'active_sprint': SprintSerializer(active_sprint).data,
+            'days_remaining': days_remaining,
+            'columns': columns,
+        }, status=status.HTTP_200_OK)
+
+
+class WorkItemStatusTransitionView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/work-items/{item_number}/status/
+    Transitions work item status across Kanban columns.
+    """
+
+    @extend_schema(
+        summary="Transition work item status (Kanban column move)",
+        request=WorkItemStatusTransitionSerializer,
+        responses={200: WorkItemSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug, item_number):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        serializer = WorkItemStatusTransitionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated_item = services.transition_work_item_status(
+            project=project,
+            user=request.user,
+            item_number=item_number,
+            new_status=serializer.validated_data['status'],
+        )
+        return Response(WorkItemSerializer(updated_item).data, status=status.HTTP_200_OK)
+

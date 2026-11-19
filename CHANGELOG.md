@@ -5,6 +5,45 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-11-19 - Phase 5: Sprint Lifecycle & Interactive Kanban Board
+### Added
+- Enterprise Sprint Lifecycle data model: `Sprint` in `apps.projects`:
+  - `Sprint`: UUID PK, project FK, name (e.g. `Sprint 1`), sprint goal, start date, end date, actual start/completion timestamps, status (`PLANNING`, `ACTIVE`, `COMPLETED`, `CANCELLED`), planned story points (frozen baseline), and completed story points.
+  - Linked `WorkItem` with foreign key `sprint` (`db_column='sprint_id'`).
+- Applied migration `0002_remove_workitem_sprint_id_sprint_workitem_sprint_and_more` to live Supabase PostgreSQL 17.
+- Service Layer (`apps.projects.services`):
+  - `create_sprint`: Validates sprint time-box and initial `PLANNING` status.
+  - `start_sprint`: Pessimistic locking on project row (`select_for_update`) to strictly enforce the Single Active Sprint Invariant across concurrent requests. Snapshots planned story points to freeze baseline velocity and transitions all assigned backlog items to `TODO`.
+  - `complete_sprint`: Calculates final velocity, checks unfinished tickets, and executes explicit rollover to either the Product Backlog or a designated future planned sprint.
+  - `cancel_sprint`: Aborts active sprint and safely cascades incomplete items back to the backlog.
+  - `add_work_items_to_sprint` & `remove_work_items_from_sprint`: Batch assignment service.
+  - `transition_work_item_status`: Atomic state transitions across Kanban swimlanes (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`) with automatic timestamp tracking.
+- Scoped selectors (`apps.projects.selectors`) with `select_related('sprint', 'assignee')` to eliminate N+1 queries during Kanban board rendering.
+- REST API endpoints mounted under `/api/v1/workspaces/{workspace_slug}/projects/{project_slug}/`:
+  - `GET /sprints/` & `POST /sprints/` (Sprint collection & creation)
+  - `GET /sprints/{id}/`, `PATCH /sprints/{id}/`, `DELETE /sprints/{id}/`
+  - `POST /sprints/{id}/start/` (Sprint activation)
+  - `POST /sprints/{id}/complete/` (Sprint completion with rollover)
+  - `POST /sprints/{id}/cancel/` (Sprint cancellation)
+  - `POST /sprints/{id}/add-items/` & `POST /sprints/{id}/remove-items/`
+  - `GET /board/` (Active sprint board with column card groupings & velocity metrics)
+  - `POST /items/{item_number}/transition/` (Single-click card status movement)
+- Automated unit test suite (`apps.projects.tests.test_sprints_and_kanban.py`) — 7/7 tests passing (full test suite: 33/33 passing in 89.57s).
+- Validated OpenAPI 3.0 schema generation with `drf-spectacular` (0 errors, 0 warnings).
+- Frontend Executive UI & Interactive Kanban Board:
+  - Google Stitch-grade executive light theme (`slate-50` background, crisp white cards, `slate-200` borders, `blue-600` accents).
+  - Strict zero-emoji policy: 100% SVG Lucide React icons.
+  - `KanbanBoard.tsx`: Live active sprint board with sprint banner (name, goal, days left countdown, velocity progress bar), 4 swimlanes (`To Do`, `In Progress`, `In Review`, `Done`), drag-and-drop card movement, and touch-friendly column shift arrows (`<` and `>`) for mobile viewports.
+  - `CreateSprintModal.tsx`: Time-box sprint planning modal.
+  - `StartSprintModal.tsx`: Scope commitment and sprint activation modal.
+  - `CompleteSprintModal.tsx`: Retrospective completion modal with rollover choice for unfinished items.
+  - `BacklogPage.tsx`: Integrated Sprint Planning section with "+ Create Sprint" button, sprint cards, and backlog item "Move to Sprint..." selector.
+  - Verified frontend production build (`npm run build` in 4.79s).
+- Comprehensive Phase 5 documentation:
+  - `docs/learning/phase-5_sprints_kanban_concepts.md` (Scrum vs Kanban, single active sprint invariant, points freezing, and rollover dilemma in Hinglish).
+  - `docs/decisions/phase-5_decisions.md` (ADRs 015-018).
+  - `docs/phase-reports/phase-5_completion.md`.
+
 ## [0.4.0] - 2026-11-19 - Phase 4: Projects & Product Backlog Management
 ### Added
 - Enterprise Projects modular app: `apps.projects`.

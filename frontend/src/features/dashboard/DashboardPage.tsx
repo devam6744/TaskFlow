@@ -230,7 +230,7 @@ export const DashboardPage: React.FC = () => {
                   }`}
                 >
                   <Kanban className="w-4 h-4 text-blue-600" />
-                  <span>Sprint 1 Board</span>
+                  <span>Active Sprint Board</span>
                 </button>
 
                 {activeWorkspace && (
@@ -276,6 +276,16 @@ export const DashboardPage: React.FC = () => {
                   </div>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
                     Phase 4 Active
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-purple-50/60 border border-purple-100 text-purple-900 font-medium">
+                  <div className="flex items-center gap-3">
+                    <Kanban className="w-4 h-4 text-purple-600" />
+                    <span>Sprint & Kanban</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                    Phase 5 Active
                   </span>
                 </div>
 

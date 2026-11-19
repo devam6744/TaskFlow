@@ -8,6 +8,7 @@ from apps.projects.models import (
     Project,
     ProjectMember,
     WorkItem,
+    Sprint,
     FIBONACCI_STORY_POINTS,
 )
 from apps.workspaces.api.serializers import UserSummarySerializer
@@ -87,6 +88,7 @@ class WorkItemSerializer(serializers.ModelSerializer):
     key_identifier = serializers.ReadOnlyField()
     reporter = UserSummarySerializer(read_only=True)
     assignee = UserSummarySerializer(read_only=True)
+    sprint_id = serializers.UUIDField(source='sprint.id', read_only=True, allow_null=True)
 
     class Meta:
         model = WorkItem
@@ -142,3 +144,80 @@ class WorkItemReorderSerializer(serializers.Serializer):
     """Input serializer for fractional drag-and-drop reordering."""
     prev_item_id = serializers.UUIDField(required=False, allow_null=True)
     next_item_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class SprintSerializer(serializers.ModelSerializer):
+    """Full representation of an Agile Sprint."""
+    created_by = UserSummarySerializer(read_only=True)
+    total_items = serializers.SerializerMethodField()
+    total_story_points = serializers.SerializerMethodField()
+    done_items = serializers.SerializerMethodField()
+    done_story_points = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Sprint
+        fields = [
+            'id', 'name', 'sprint_goal', 'start_date', 'end_date',
+            'actual_started_at', 'actual_completed_at', 'status',
+            'planned_story_points', 'completed_story_points',
+            'created_by', 'created_at', 'updated_at',
+            'total_items', 'total_story_points', 'done_items', 'done_story_points'
+        ]
+        read_only_fields = [
+            'id', 'actual_started_at', 'actual_completed_at',
+            'status', 'planned_story_points', 'completed_story_points',
+            'created_by', 'created_at', 'updated_at'
+        ]
+
+    def get_total_items(self, obj) -> int:
+        return obj.work_items.filter(archived_at__isnull=True).count()
+
+    def get_total_story_points(self, obj) -> int:
+        return sum(
+            item.story_points or 0
+            for item in obj.work_items.filter(archived_at__isnull=True)
+        )
+
+    def get_done_items(self, obj) -> int:
+        return obj.work_items.filter(status=WorkItem.Status.DONE, archived_at__isnull=True).count()
+
+    def get_done_story_points(self, obj) -> int:
+        return sum(
+            item.story_points or 0
+            for item in obj.work_items.filter(status=WorkItem.Status.DONE, archived_at__isnull=True)
+        )
+
+
+class SprintCreateSerializer(serializers.Serializer):
+    """Input serializer for creating a new Sprint."""
+    name = serializers.CharField(max_length=100, required=True, trim_whitespace=True)
+    sprint_goal = serializers.CharField(required=False, allow_blank=True, default='')
+    start_date = serializers.DateField(required=False, allow_null=True)
+    end_date = serializers.DateField(required=False, allow_null=True)
+
+
+class SprintStartSerializer(serializers.Serializer):
+    """Input serializer for activating a Sprint."""
+    sprint_goal = serializers.CharField(required=True, allow_blank=False, trim_whitespace=True)
+    start_date = serializers.DateField(required=False, allow_null=True)
+    end_date = serializers.DateField(required=False, allow_null=True)
+
+
+class SprintCompleteSerializer(serializers.Serializer):
+    """Input serializer for completing an active Sprint."""
+    rollover_to_backlog = serializers.BooleanField(required=False, default=True)
+    next_sprint_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class SprintItemsActionSerializer(serializers.Serializer):
+    """Input serializer for adding or removing items from a Sprint."""
+    item_numbers = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False
+    )
+
+
+class WorkItemStatusTransitionSerializer(serializers.Serializer):
+    """Input serializer for changing a work item's status column."""
+    status = serializers.ChoiceField(choices=WorkItem.Status.choices)
+

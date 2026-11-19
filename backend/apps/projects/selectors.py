@@ -6,7 +6,7 @@ Encapsulates all project and work item queries with select_related to prevent N+
 
 from django.db.models import QuerySet, Q
 from apps.workspaces.models import Workspace, WorkspaceMember
-from apps.projects.models import Project, WorkItem, ProjectMember
+from apps.projects.models import Project, WorkItem, ProjectMember, Sprint
 
 
 def get_workspace_projects(workspace: Workspace, user, include_archived: bool = False) -> QuerySet[Project]:
@@ -79,3 +79,24 @@ def get_work_item_by_number(project: Project, item_number: int) -> WorkItem | No
         project=project,
         item_number=item_number
     ).select_related('assignee', 'reporter', 'project').first()
+
+
+def get_project_sprints(project: Project) -> QuerySet[Sprint]:
+    """Retrieve all sprints in a project ordered by state and start date."""
+    return Sprint.objects.filter(project=project).select_related('created_by').prefetch_related('work_items')
+
+
+def get_active_sprint(project: Project) -> Sprint | None:
+    """Retrieve the single active sprint for the project, if one exists."""
+    return Sprint.objects.filter(
+        project=project,
+        status=Sprint.Status.ACTIVE
+    ).select_related('created_by').first()
+
+
+def get_sprint_work_items(sprint: Sprint) -> QuerySet[WorkItem]:
+    """Retrieve all work items assigned to a sprint."""
+    return WorkItem.objects.filter(
+        sprint=sprint,
+        archived_at__isnull=True
+    ).select_related('assignee', 'reporter').order_by('backlog_order', '-created_at')

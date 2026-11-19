@@ -113,15 +113,52 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 5 — Sprint Lifecycle & Kanban Board (NEXT)
-- [ ] Implement `Sprint` model (UUID PK, project FK, name e.g. "Sprint 1", sprint_goal, start_date, end_date, status: PLANNING, ACTIVE, COMPLETED, velocity_points)
-- [ ] Enforce backend invariant: Only one ACTIVE sprint per project at a time
-- [ ] Implement Sprint lifecycle service methods (`start_sprint`, `complete_sprint`, `rollover_incomplete_items`)
-- [ ] Link `WorkItem` to `Sprint` with sprint status transitions (BACKLOG -> SPRINT -> DONE)
-- [ ] Implement Sprint metrics and burndown data calculations
-- [ ] Sprint API endpoints (`/projects/{slug}/sprints/`, `/sprints/{id}/start/`, `/sprints/{id}/complete/`)
-- [ ] Interactive Drag-and-Drop Sprint Kanban Board UI with column WIP limits
-- [ ] Automated tests for sprint state machine transitions and rollover
+## 🏁 Phase 5: Sprint Lifecycle & Interactive Kanban Board (COMPLETED ✅)
+- [x] Implement `Sprint` model (UUID PK, project FK, name e.g. "Sprint 1", sprint_goal, start_date, end_date, actual_started_at, actual_completed_at, status: PLANNING, ACTIVE, COMPLETED, CANCELLED, planned_story_points, completed_story_points)
+- [x] Link `WorkItem` to `Sprint` foreign key (`db_column='sprint_id'`)
+- [x] Enforce backend invariant: Only one ACTIVE sprint per project at a time via pessimistic row locking (`Project.objects.select_for_update()`)
+- [x] Implement Sprint lifecycle service methods in `apps/projects/services.py`:
+  - `create_sprint` (name, goal, dates, initial PLANNING state)
+  - `start_sprint` (verifies no active sprint, snapshots committed story points, atomically transitions items from BACKLOG to TODO)
+  - `complete_sprint` (calculates completed vs incomplete story points, handles explicit rollover of incomplete items to BACKLOG or target sprint)
+  - `cancel_sprint` (aborts sprint and rolls incomplete items back to product backlog)
+  - `add_work_items_to_sprint` & `remove_work_items_from_sprint`
+  - `transition_work_item_status` (atomic status updates: TODO, IN_PROGRESS, IN_REVIEW, DONE)
+- [x] Scoped selectors (`apps/projects/selectors.py`) for active sprint, project sprints, and sprint work items
+- [x] Sprint & Kanban REST API endpoints mounted under `/api/v1/workspaces/{workspace_slug}/projects/{project_slug}/`:
+  - `GET /sprints/`, `POST /sprints/`
+  - `GET /sprints/{id}/`, `PATCH /sprints/{id}/`, `DELETE /sprints/{id}/`
+  - `POST /sprints/{id}/start/`
+  - `POST /sprints/{id}/complete/`
+  - `POST /sprints/{id}/cancel/`
+  - `POST /sprints/{id}/add-items/`, `POST /sprints/{id}/remove-items/`
+  - `GET /board/` (Active sprint board with columns & metrics)
+  - `POST /items/{item_number}/transition/` (Move cards across swimlanes)
+- [x] Automated test suite (`apps/projects/tests/test_sprints_and_kanban.py`) — 7/7 tests passing (full test suite: 33/33 passing)
+- [x] OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors, 0 warnings)
+- [x] Frontend Executive Light-Theme Sprint & Kanban UI:
+  - Google Stitch-grade executive light theme (`slate-50` canvas, crisp white cards, `slate-200` borders, `blue-600` accents)
+  - Strict zero-emoji policy: 100% SVG Lucide React icons
+  - `KanbanBoard.tsx`: Real active sprint board with sprint banner (name, goal, days left countdown, velocity progress bar), 4 swimlanes (`To Do`, `In Progress`, `In Review`, `Done`), drag-and-drop card movement, and touch-friendly column shift arrows (`<` and `>`) for mobile viewports
+  - `CreateSprintModal.tsx`: Modal for planning new sprint time-boxes
+  - `StartSprintModal.tsx`: Modal for locking committed scope and activating sprint
+  - `CompleteSprintModal.tsx`: Retrospective completion modal with rollover choice for unfinished items
+  - `BacklogPage.tsx`: Integrated Sprint Planning section with "+ Create Sprint" button, sprint cards, and backlog item "Move to Sprint..." selector
+  - Verified frontend production build (`npm run build` in 4.79s)
+- [x] Comprehensive documentation:
+  - `docs/learning/phase-5_sprints_kanban_concepts.md` (Scrum vs Kanban, single active sprint invariant, points freezing, and rollover dilemma in Hinglish)
+  - `docs/decisions/phase-5_decisions.md` (ADRs 015-018)
+  - `docs/phase-reports/phase-5_completion.md`
+
+---
+
+## 🚀 Active Milestone: Phase 6 — Collaboration & Work Item Comments (NEXT)
+- [ ] Implement `Comment` model (UUID PK, work_item FK, author FK, text, attachments JSON, created_at, updated_at)
+- [ ] Implement Work Item Activity Audit Log (`Activity` model: field_changed, old_value, new_value, user)
+- [ ] Attachment upload handling with file type/size validation and secure storage
+- [ ] Comment and Activity API endpoints under `/projects/{slug}/items/{item_number}/comments/`
+- [ ] Frontend Discussion Thread & Activity Feed in Work Item Drawer
+- [ ] Automated tests for comment permissions, deletion grace period, and audit trail
 
 
 ---

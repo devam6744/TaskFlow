@@ -232,6 +232,71 @@ class ProjectMember(models.Model):
         return f'{self.user.email} -> {self.project.key} [{self.role}]'
 
 
+class Sprint(models.Model):
+    """
+    Time-boxed Agile Sprint entity scoped to a Project.
+    A project can have at most one ACTIVE sprint at any given time.
+    """
+
+    class Status(models.TextChoices):
+        PLANNING = 'PLANNING', 'Planning'
+        ACTIVE = 'ACTIVE', 'Active'
+        COMPLETED = 'COMPLETED', 'Completed'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='sprints',
+        help_text="Project container this sprint belongs to"
+    )
+    name = models.CharField(max_length=100, help_text="e.g. 'Sprint 1', 'Sprint 2 - Core Auth'")
+    sprint_goal = models.TextField(blank=True, default='', help_text="Core objective for this sprint")
+
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    actual_started_at = models.DateTimeField(null=True, blank=True)
+    actual_completed_at = models.DateTimeField(null=True, blank=True)
+
+    status = models.CharField(
+        max_length=15,
+        choices=Status.choices,
+        default=Status.PLANNING,
+        db_index=True
+    )
+
+    planned_story_points = models.PositiveIntegerField(
+        default=0,
+        help_text="Snapshot of committed story points at sprint activation"
+    )
+    completed_story_points = models.PositiveIntegerField(
+        default=0,
+        help_text="Final completed points tally upon sprint completion"
+    )
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_sprints'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'projects_sprint'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', 'status'], name='sprint_proj_status_idx'),
+        ]
+        verbose_name = 'Sprint'
+        verbose_name_plural = 'Sprints'
+
+    def __str__(self) -> str:
+        return f'{self.project.key}: {self.name} [{self.status}]'
+
+
 class WorkItem(models.Model):
     """
     The fundamental unit of agile work (Story, Task, Bug, Improvement).
@@ -321,8 +386,16 @@ class WorkItem(models.Model):
         help_text="Positional index for backlog ranking"
     )
 
-    # Sprint association (Nullable - Phase 5 connects Sprints)
-    sprint_id = models.UUIDField(null=True, blank=True, db_index=True)
+    # Sprint association
+    sprint = models.ForeignKey(
+        Sprint,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='work_items',
+        db_column='sprint_id',
+        help_text="Sprint time-box this item is committed to"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

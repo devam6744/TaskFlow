@@ -1,7 +1,7 @@
 # TaskFlow — System Architecture & Context Handoff Guide
 
 > **Target Audience:** Any AI model, engineer, or contributor picking up development on this repository.
-> **Last Updated:** Phase 4 (Projects & Product Backlog Management)
+> **Last Updated:** Phase 5 (Sprint Lifecycle & Interactive Kanban Board)
 > **Single Source of Truth:** Refer to [BLUEPRINT.md](file:///c:/Users/maushmi/Desktop/DAJNGO/teampluse/BLUEPRINT.md) for full architectural specs.
 
 ---
@@ -34,13 +34,13 @@ TaskFlow/
 │   ├── apps/
 │   │   ├── accounts/          # Phase 1 & 2: CustomUser, Auth Views, JWT, Services
 │   │   ├── workspaces/        # Phase 3: Workspace, Membership, Invites, RBAC
-│   │   └── projects/          # Phase 4: Project, ProjectMember, WorkItem, LexoRank, DoD
-│   │       ├── api/           # Serializers, Views, URLs
-│   │       ├── models.py      # Project, ProjectMember, WorkItem (Fibonacci, keys)
-│   │       ├── services.py    # select_for_update atomic keys, LexoRank reorder
-│   │       ├── selectors.py   # Scoped project & backlog queries
-│   │       ├── permissions.py # Project-level RBAC & private project isolation
-│   │       └── tests/         # 7 tests: isolation, sequential keys, LexoRank, Fibonacci
+│   │   ├── projects/          # Phase 4 & 5: Project, Sprint, WorkItem, LexoRank, DoD, Kanban
+│   │   │   ├── api/           # Serializers, Views (Sprint CRUD, Board, LexoRank), URLs
+│   │   │   ├── models.py      # Project, Sprint (Single Active Invariant), WorkItem (Fibonacci, keys)
+│   │   │   ├── services.py    # select_for_update atomic keys, LexoRank reorder, Sprint lifecycle & rollover
+│   │   │   ├── selectors.py   # Scoped project, sprint, board & backlog queries
+│   │   │   ├── permissions.py # Project-level RBAC & private project isolation
+│   │   │   └── tests/         # test_projects_and_backlog (7 tests), test_sprints_and_kanban (7 tests)
 │   ├── config/
 │   │   ├── settings/
 │   │   │   └── base.py        # Django config, DB url, SimpleJWT, CORS
@@ -51,11 +51,12 @@ TaskFlow/
 │   ├── src/
 │   │   ├── features/
 │   │   │   ├── auth/          # Unified AuthPage, ProtectedRoute
-│   │   │   ├── dashboard/     # DashboardPage, Metrics, Kanban, QuickSearch (Ctrl+K)
+│   │   │   ├── dashboard/     # DashboardPage, Metrics, KanbanBoard (drag-and-drop & touch arrows), QuickSearch (Ctrl+K)
 │   │   │   ├── landing/       # LandingPage, Hero, Features, Workflow, Security
 │   │   │   ├── workspaces/    # WorkspaceSwitcher, CreateModal, MembersModal, JoinPage
 │   │   │   ├── projects/      # CreateProjectModal
-│   │   │   └── backlog/       # BacklogPage, WorkItemDetailModal
+│   │   │   ├── sprints/       # CreateSprintModal, StartSprintModal, CompleteSprintModal
+│   │   │   └── backlog/       # BacklogPage (Sprint planning & Backlog LexoRank), WorkItemDetailModal
 │   │   ├── lib/
 │   │   │   └── api.ts         # Axios client with 401 token refresh interceptor
 │   │   ├── stores/
@@ -63,7 +64,7 @@ TaskFlow/
 │   │   │   ├── workspaceStore.ts # Zustand workspace & member state
 │   │   │   ├── projectStore.ts   # Zustand projects & active project state
 │   │   │   ├── backlogStore.ts   # Zustand backlog & LexoRank reorder state
-│   │   │   └── toastStore.ts  # Notification toasts
+│   │   │   ├── sprintStore.ts    # Zustand sprints, active sprint board & card transitions
 │   │   │   └── toastStore.ts  # Notification toasts
 │   │   ├── App.tsx
 │   │   └── main.tsx
@@ -103,10 +104,23 @@ TaskFlow/
 | `POST` | `/api/v1/workspaces/{slug}/invites/` | Generate secure invitation | Yes (Admin/Owner) |
 | `DELETE` | `/api/v1/workspaces/{slug}/invites/{id}/` | Revoke invitation | Yes (Admin/Owner) |
 | `POST` | `/api/v1/workspaces/invites/accept/` | Accept invitation token | Yes |
+| `GET` | `/api/v1/workspaces/{slug}/projects/` | List projects in workspace | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/` | Create project in workspace | Yes (Member) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/` | Project details & DoD | Yes (Member) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/backlog/` | Get LexoRank sorted backlog | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/backlog/` | Create work item (atomic seq key) | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/backlog/{num}/reorder/` | LexoRank O(1) fractional reorder | Yes (Member) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/sprints/` | List project sprints | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/sprints/` | Create sprint container | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/sprints/{id}/start/` | Start sprint (Single active invariant) | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/sprints/{id}/complete/` | Complete sprint with rollover | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/sprints/{id}/cancel/` | Cancel sprint | Yes (Member) |
+| `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/board/` | Active sprint Kanban board | Yes (Member) |
+| `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/transition/` | Kanban card swimlane transition | Yes (Member) |
 | `GET` | `/api/docs/` | Swagger OpenAPI UI | No |
 
 ---
 
 ## 5. Next Planned Work (SDLC Roadmap)
-- **Phase 4:** Projects & Product Backlog (Project entity, project membership, backlog items, user stories, acceptance criteria).
-- **Phase 5:** Sprint Lifecycle & Kanban Board (Sprint state machine, burndown, drag-and-drop board).
+- **Phase 6:** Collaboration & Work Item Comments (Discussion threads, file attachments, and audit trail).
+- **Phase 7:** Notifications & Background Processing (In-app alerts, Celery / Redis asynchronous tasks).
