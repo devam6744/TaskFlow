@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     # TaskFlow Modular Apps
     'apps.accounts',
     'apps.workspaces',
+    'apps.projects',
 ]
 
 # Custom User Model (Mandatory before first migration)

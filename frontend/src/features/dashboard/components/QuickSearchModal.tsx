@@ -5,17 +5,19 @@ import {
   LayoutDashboard,
   Kanban,
   Users2,
+  FolderGit2,
   Plus,
   User,
   ArrowRight,
   Command,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../../stores/workspaceStore';
+import { useProjectStore } from '../../../stores/projectStore';
 
 interface QuickSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigateTab: (tab: 'overview' | 'kanban') => void;
+  onNavigateTab: (tab: 'overview' | 'kanban' | 'backlog') => void;
   onOpenProfile: () => void;
   onOpenCreateWorkspace: () => void;
   onOpenMembers: () => void;
@@ -43,6 +45,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { workspaces, setActiveWorkspace } = useWorkspaceStore();
+  const { projects, setActiveProject } = useProjectStore();
 
   useEffect(() => {
     if (isOpen) {
@@ -63,6 +66,17 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       icon: <LayoutDashboard className="w-4 h-4 text-blue-600" />,
       action: () => {
         onNavigateTab('overview');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-backlog',
+      category: 'Navigation',
+      title: 'Projects & Product Backlog',
+      subtitle: 'Manage user stories, tasks, bugs, and Fibonacci estimates',
+      icon: <FolderGit2 className="w-4 h-4 text-blue-600" />,
+      action: () => {
+        onNavigateTab('backlog');
         onClose();
       },
     },
@@ -119,6 +133,19 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       icon: <Building2 className="w-4 h-4 text-blue-600" />,
       action: () => {
         setActiveWorkspace(ws);
+        onClose();
+      },
+    })),
+    // Dynamic projects
+    ...projects.map((proj) => ({
+      id: `proj-${proj.id}`,
+      category: 'Navigation' as const,
+      title: `${proj.name} [${proj.key}]`,
+      subtitle: `Jump to project backlog (${proj.backlog_count || 0} items)`,
+      icon: <FolderGit2 className="w-4 h-4 text-blue-600" />,
+      action: () => {
+        setActiveProject(proj);
+        onNavigateTab('backlog');
         onClose();
       },
     })),

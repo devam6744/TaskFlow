@@ -78,14 +78,51 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 4 — Projects & Product Backlog (NEXT)
-- [ ] Implement `Project` model (UUID PK, workspace FK, name, description, status, visibility, dates, definition_of_done)
-- [ ] Implement `ProjectMembership` model for private project access control
-- [ ] Implement Product Backlog models (`WorkItem` baseline, types: Story, Task, Bug, Improvement)
-- [ ] Service layer: `create_project`, `archive_project`, `assign_project_member`
-- [ ] Project API endpoints (`/api/v1/workspaces/{slug}/projects/`)
-- [ ] Automated tests for project workspace-scoping and visibility
-- [ ] Frontend Projects list, create modal, and project view
+## 🏁 Phase 4: Projects & Product Backlog Management (COMPLETED ✅)
+- [x] Create modular Django app `apps/projects`
+- [x] Implement `Project`, `ProjectMember`, and `WorkItem` models (UUID PKs, workspace FK, slug, key e.g. `TF`, visibility: `WORKSPACE` vs `PRIVATE`, `definition_of_done`)
+- [x] Implement `WorkItem` with sequential atomic keys (`item_number` via `select_for_update`), `key_identifier` (e.g. `TF-1`), types (`STORY`, `TASK`, `BUG`, `IMPROVEMENT`), priorities, statuses, and float `backlog_order`
+- [x] Apply migrations to live Supabase PostgreSQL 17 (`projects.0001_initial`)
+- [x] Implement Fractional Indexing (LexoRank) algorithm in `apps/projects/services.py` for $O(1)$ single-row drag-and-drop reordering: `(prev + next) / 2.0`
+- [x] Implement strict Fibonacci Story Point validation (`[1, 2, 3, 5, 8, 13, 21]`)
+- [x] Scoped selectors (`selectors.py`) with `select_related('lead', 'created_by')` to eliminate N+1 queries
+- [x] Scoped permissions (`permissions.py`) with private project isolation and Workspace Owner universal access
+- [x] Implement full REST API endpoints mounted under `/api/v1/workspaces/{workspace_slug}/projects/`:
+  - `GET /`, `POST /`, `GET /{slug}/`, `PATCH /{slug}/`, `DELETE /{slug}/`
+  - `GET /{slug}/backlog/`, `POST /{slug}/backlog/`
+  - `PATCH /{slug}/backlog/{item_number}/`, `DELETE /{slug}/backlog/{item_number}/`
+  - `POST /{slug}/backlog/{item_number}/reorder/` (LexoRank endpoint)
+- [x] Automated test suite (`apps/projects/tests/test_projects_and_backlog.py`) — 7/7 tests passing (26/26 full suite passing)
+- [x] OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors)
+- [x] Frontend Executive Light-Theme Backlog UI (`BacklogPage.tsx`):
+  - Google Stitch-grade executive light theme (`slate-50` canvas, crisp white cards, `slate-200` borders, `blue-600` accents)
+  - Zero Emojis Policy strictly enforced (100% SVG Lucide React icons)
+  - Project Switcher and "New Project" modal (`CreateProjectModal.tsx`)
+  - Definition of Done (DoD) viewer toggle and project quality banner
+  - Agile KPI stats bar (Total items, Story Points sum, Estimated coverage %, Done count)
+  - Inline Quick-Create form (`Story`/`Task`/`Bug`/`Improvement`, title input, Fibonacci points selector)
+  - Backlog list with mobile & touch-friendly Move Up/Down buttons invoking LexoRank $O(1)$ reordering
+  - Work item detail & editing modal (`WorkItemDetailModal.tsx`)
+  - Global `Ctrl+K` Command Palette updated to search across projects and backlog items
+  - Responsive layout for mobile viewports and touch targets
+  - Production build verified (`npm run build` in 1.78s)
+- [x] Comprehensive documentation:
+  - `docs/learning/phase-4_projects_backlog_concepts.md` (Fibonacci, LexoRank, DoD, sequential keys in Hinglish)
+  - `docs/decisions/phase-4_decisions.md` (ADRs 011-014)
+  - `docs/phase-reports/phase-4_completion.md`
+
+---
+
+## 🚀 Active Milestone: Phase 5 — Sprint Lifecycle & Kanban Board (NEXT)
+- [ ] Implement `Sprint` model (UUID PK, project FK, name e.g. "Sprint 1", sprint_goal, start_date, end_date, status: PLANNING, ACTIVE, COMPLETED, velocity_points)
+- [ ] Enforce backend invariant: Only one ACTIVE sprint per project at a time
+- [ ] Implement Sprint lifecycle service methods (`start_sprint`, `complete_sprint`, `rollover_incomplete_items`)
+- [ ] Link `WorkItem` to `Sprint` with sprint status transitions (BACKLOG -> SPRINT -> DONE)
+- [ ] Implement Sprint metrics and burndown data calculations
+- [ ] Sprint API endpoints (`/projects/{slug}/sprints/`, `/sprints/{id}/start/`, `/sprints/{id}/complete/`)
+- [ ] Interactive Drag-and-Drop Sprint Kanban Board UI with column WIP limits
+- [ ] Automated tests for sprint state machine transitions and rollover
+
 
 ---
 

@@ -1,0 +1,358 @@
+"""
+Project & Backlog Views — Phase 4: REST API Endpoints
+"""
+
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import NotFound, PermissionDenied
+from drf_spectacular.utils import extend_schema, OpenApiResponse
+from django.contrib.auth import get_user_model
+
+from apps.workspaces.models import Workspace
+from apps.projects.models import Project, ProjectMember, WorkItem
+from apps.projects import services, selectors
+from apps.projects.api.serializers import (
+    ProjectSerializer,
+    ProjectCreateSerializer,
+    ProjectUpdateSerializer,
+    ProjectMemberSerializer,
+    ProjectMemberAddSerializer,
+    WorkItemSerializer,
+    WorkItemCreateSerializer,
+    WorkItemUpdateSerializer,
+    WorkItemReorderSerializer,
+)
+
+User = get_user_model()
+
+
+class BaseWorkspaceProjectView(APIView):
+    """Base helper to resolve workspace and project from URL parameters."""
+    permission_classes = [IsAuthenticated]
+
+    def get_workspace(self, workspace_slug: str) -> Workspace:
+        workspace = Workspace.objects.filter(slug=workspace_slug).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+        self.workspace = workspace
+        return workspace
+
+    def get_project(self, workspace: Workspace, project_slug: str) -> Project:
+        project = selectors.get_project_by_slug(workspace, project_slug, self.request.user)
+        if not project:
+            raise NotFound(f"Project '{project_slug}' not found or access denied.")
+        self.project = project
+        return project
+
+
+class ProjectListCreateView(APIView):
+    """
+    GET  /api/v1/workspaces/{workspace_slug}/projects/ - List all projects user has access to.
+    POST /api/v1/workspaces/{workspace_slug}/projects/ - Create a new project.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="List accessible projects in workspace",
+        responses={200: ProjectSerializer(many=True)},
+    )
+    def get(self, request, workspace_slug):
+        workspace = Workspace.objects.filter(slug=workspace_slug).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+
+        projects = selectors.get_workspace_projects(workspace, request.user)
+        serializer = ProjectSerializer(projects, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Create a new project",
+        request=ProjectCreateSerializer,
+        responses={201: ProjectSerializer},
+    )
+    def post(self, request, workspace_slug):
+        workspace = Workspace.objects.filter(slug=workspace_slug).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+
+        serializer = ProjectCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        lead = None
+        if data.get('lead_id'):
+            lead = User.objects.filter(id=data['lead_id']).first()
+
+        project = services.create_project(
+            workspace=workspace,
+            user=request.user,
+            name=data['name'],
+            key=data.get('key'),
+            description=data.get('description', ''),
+            visibility=data.get('visibility', Project.Visibility.WORKSPACE),
+            lead=lead,
+            start_date=data.get('start_date'),
+            target_date=data.get('target_date'),
+            definition_of_done=data.get('definition_of_done', '')
+        )
+
+        return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectDetailView(BaseWorkspaceProjectView):
+    """
+    GET   /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/
+    PATCH /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/
+    """
+
+    @extend_schema(
+        summary="Get project details by slug",
+        responses={200: ProjectSerializer},
+    )
+    def get(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Update project details",
+        request=ProjectUpdateSerializer,
+        responses={200: ProjectSerializer},
+    )
+    def patch(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        serializer = ProjectUpdateSerializer(project, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        updated = services.update_project(project, request.user, **serializer.validated_data)
+        return Response(ProjectSerializer(updated).data, status=status.HTTP_200_OK)
+
+
+class ProjectArchiveView(BaseWorkspaceProjectView):
+    """Soft-archive a project."""
+    @extend_schema(
+        summary="Archive project",
+        request=None,
+        responses={200: OpenApiResponse(description="Project archived")}
+    )
+    def post(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        services.archive_project(project, request.user)
+        return Response({'detail': f"Project '{project.name}' archived."}, status=status.HTTP_200_OK)
+
+
+class ProjectUnarchiveView(BaseWorkspaceProjectView):
+    """Restore an archived project."""
+    @extend_schema(
+        summary="Unarchive project",
+        request=None,
+        responses={200: OpenApiResponse(description="Project restored")}
+    )
+    def post(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        services.unarchive_project(project, request.user)
+        return Response({'detail': f"Project '{project.name}' restored."}, status=status.HTTP_200_OK)
+
+
+class ProjectMemberListCreateView(BaseWorkspaceProjectView):
+    """List or add members to a private project."""
+
+    @extend_schema(
+        summary="List private project members",
+        responses={200: ProjectMemberSerializer(many=True)},
+    )
+    def get(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        members = ProjectMember.objects.filter(project=project).select_related('user')
+        return Response(ProjectMemberSerializer(members, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Add member to private project",
+        request=ProjectMemberAddSerializer,
+        responses={201: ProjectMemberSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        serializer = ProjectMemberAddSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user = User.objects.filter(email=serializer.validated_data['email']).first()
+        if not target_user:
+            raise NotFound("User with this email not found.")
+
+        member = services.add_project_member(
+            project=project,
+            target_user=target_user,
+            role=serializer.validated_data['role'],
+            requesting_user=request.user
+        )
+        return Response(ProjectMemberSerializer(member).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectMemberDetailView(BaseWorkspaceProjectView):
+    """Remove a member from a private project."""
+    @extend_schema(
+        summary="Remove member from private project",
+        responses={200: OpenApiResponse(description="Member removed")}
+    )
+    def delete(self, request, workspace_slug, project_slug, user_id):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        target_user = User.objects.filter(id=user_id).first()
+        if not target_user:
+            raise NotFound("Target user not found.")
+
+        services.remove_project_member(project, target_user, request.user)
+        return Response({'detail': 'Project member removed.'}, status=status.HTTP_200_OK)
+
+
+# -------------------------------------------------------------
+# Backlog & WorkItem Endpoints
+# -------------------------------------------------------------
+
+class BacklogItemListCreateView(BaseWorkspaceProjectView):
+    """
+    GET  /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/backlog/ - List backlog items.
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/backlog/ - Create backlog work item.
+    """
+
+    @extend_schema(
+        summary="List prioritized product backlog items",
+        responses={200: WorkItemSerializer(many=True)},
+    )
+    def get(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        backlog_items = selectors.get_project_backlog(project)
+        return Response(WorkItemSerializer(backlog_items, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Create backlog work item (Story, Task, Bug)",
+        request=WorkItemCreateSerializer,
+        responses={201: WorkItemSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        serializer = WorkItemCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        assignee = None
+        if data.get('assignee_id'):
+            assignee = User.objects.filter(id=data['assignee_id']).first()
+
+        item = services.create_work_item(
+            project=project,
+            user=request.user,
+            title=data['title'],
+            type=data.get('type', WorkItem.Type.STORY),
+            priority=data.get('priority', WorkItem.Priority.MEDIUM),
+            description=data.get('description', ''),
+            story_points=data.get('story_points'),
+            acceptance_criteria=data.get('acceptance_criteria', ''),
+            assignee=assignee,
+            due_date=data.get('due_date')
+        )
+
+        return Response(WorkItemSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class WorkItemDetailView(BaseWorkspaceProjectView):
+    """
+    GET    /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/work-items/{item_number}/
+    PATCH  /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/work-items/{item_number}/
+    DELETE /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/work-items/{item_number}/
+    """
+
+    def get_work_item(self, project: Project, item_number: int) -> WorkItem:
+        item = selectors.get_work_item_by_number(project, item_number)
+        if not item:
+            raise NotFound(f"Work item '{project.key}-{item_number}' not found.")
+        return item
+
+    @extend_schema(
+        summary="Get work item detail",
+        responses={200: WorkItemSerializer},
+    )
+    def get(self, request, workspace_slug, project_slug, item_number):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        item = self.get_work_item(project, item_number)
+        return Response(WorkItemSerializer(item).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Update work item",
+        request=WorkItemUpdateSerializer,
+        responses={200: WorkItemSerializer},
+    )
+    def patch(self, request, workspace_slug, project_slug, item_number):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        item = self.get_work_item(project, item_number)
+
+        serializer = WorkItemUpdateSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        if 'assignee_id' in validated:
+            assignee_id = validated.pop('assignee_id')
+            validated['assignee'] = User.objects.filter(id=assignee_id).first() if assignee_id else None
+
+        updated_item = services.update_work_item(item, request.user, **validated)
+        return Response(WorkItemSerializer(updated_item).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Delete work item",
+        responses={200: OpenApiResponse(description="Work item deleted")}
+    )
+    def delete(self, request, workspace_slug, project_slug, item_number):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+        item = self.get_work_item(project, item_number)
+        services.delete_work_item(item, request.user)
+        return Response({'detail': 'Work item deleted successfully.'}, status=status.HTTP_200_OK)
+
+
+class WorkItemReorderView(BaseWorkspaceProjectView):
+    """
+    POST /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/work-items/{item_number}/reorder/
+    Drag-and-drop fractional reordering.
+    """
+
+    @extend_schema(
+        summary="Reorder backlog item (drag-and-drop LexoRank)",
+        request=WorkItemReorderSerializer,
+        responses={200: WorkItemSerializer},
+    )
+    def post(self, request, workspace_slug, project_slug, item_number):
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        item = selectors.get_work_item_by_number(project, item_number)
+        if not item:
+            raise NotFound(f"Work item '{project.key}-{item_number}' not found.")
+
+        serializer = WorkItemReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        reordered = services.reorder_backlog_item(
+            work_item=item,
+            user=request.user,
+            prev_item_id=serializer.validated_data.get('prev_item_id'),
+            next_item_id=serializer.validated_data.get('next_item_id')
+        )
+        return Response(WorkItemSerializer(reordered).data, status=status.HTTP_200_OK)

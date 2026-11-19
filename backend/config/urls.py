@@ -27,6 +27,7 @@ urlpatterns = [
     # TaskFlow API Endpoints
     path('api/v1/auth/', include('apps.accounts.api.urls', namespace='accounts')),
     path('api/v1/workspaces/', include('apps.workspaces.api.urls', namespace='workspaces')),
+    path('api/v1/workspaces/<slug:workspace_slug>/projects/', include('apps.projects.api.urls', namespace='projects')),
 
     # OpenAPI Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

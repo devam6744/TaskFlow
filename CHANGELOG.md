@@ -5,6 +5,43 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-19 - Phase 4: Projects & Product Backlog Management
+### Added
+- Enterprise Projects modular app: `apps.projects`.
+- Data models:
+  - `Project`: UUID PK, workspace FK, name, slug, uppercase key prefix (e.g. `TF`), visibility (`WORKSPACE`, `PRIVATE`), `lead`, `created_by`, `definition_of_done`, `is_archived`.
+  - `ProjectMember`: UUID PK, project FK, user FK, granular project roles (`LEAD`, `MEMBER`, `VIEWER`), unique together `(project, user)`.
+  - `WorkItem`: UUID PK, project FK, strictly sequential `item_number` (generated atomically via `select_for_update`), computed `key_identifier` (e.g. `TF-1`), type (`STORY`, `TASK`, `BUG`, `IMPROVEMENT`), priority (`URGENT`, `HIGH`, `MEDIUM`, `LOW`), status (`BACKLOG`, `TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`), `story_points` (Fibonacci validated), `acceptance_criteria`, `backlog_order` (float for LexoRank).
+- Database migration `projects.0001_initial` applied to Supabase PostgreSQL 17.
+- Service layer (`apps.projects.services`):
+  - `create_project`: Atomic transaction, key uppercase formatting, workspace association.
+  - `create_work_item`: Pessimistic locking (`select_for_update`) to prevent race conditions in sequential numbering.
+  - `reorder_backlog_item`: Fractional Indexing (LexoRank) midpoint calculation `(prev_order + next_order) / 2.0` achieving single-row $O(1)$ reordering.
+  - `validate_fibonacci_points`: Strict Fibonacci sequence enforcement (`1, 2, 3, 5, 8, 13, 21`).
+- Scoped selectors (`apps.projects.selectors`) with `select_related('lead', 'created_by')` to eliminate N+1 queries.
+- Multi-tenant permission classes (`ProjectPermission`) enforcing workspace membership and private project boundaries.
+- REST API endpoints mounted under `/api/v1/workspaces/{workspace_slug}/projects/`:
+  - `GET /` & `POST /` (projects collection)
+  - `GET /{slug}/`, `PATCH /{slug}/`, `DELETE /{slug}/` (project details & soft archive)
+  - `GET /{slug}/backlog/`, `POST /{slug}/backlog/` (backlog collection)
+  - `PATCH /{slug}/backlog/{item_number}/`, `DELETE /{slug}/backlog/{item_number}/` (item updates & deletion)
+  - `POST /{slug}/backlog/{item_number}/reorder/` (LexoRank fractional indexing reorder)
+- Comprehensive automated test suite (`apps.projects.tests.test_projects_and_backlog.py`) — 7/7 tests passing (full test suite: 26/26 passing).
+- OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors).
+- Frontend Executive UI & Product Backlog:
+  - Google Stitch-grade executive light theme (`slate-50` background, crisp white cards, `slate-200` borders, `blue-600` accents).
+  - Strict zero-emoji policy: 100% SVG Lucide React icons.
+  - `BacklogPage.tsx`: Agile backlog view, project switcher, Definition of Done (DoD) viewer toggle, Agile KPI stats bar (items, story points, estimated coverage %, done count), inline quick-create form, and touch-friendly Move Up/Down buttons for mobile.
+  - `CreateProjectModal.tsx`: Real-time key suggestion preview, visibility toggle, and DoD editor.
+  - `WorkItemDetailModal.tsx`: Comprehensive modal for viewing and editing work item details, Fibonacci story points, and acceptance criteria.
+  - `QuickSearchModal.tsx`: Updated `Ctrl+K` palette to search across workspaces, projects, and backlog items.
+  - `DashboardPage.tsx`: Integrated Projects & Backlog into navigation sidebar and main content canvas.
+  - Verified frontend production build (`npm run build` in 1.78s).
+- Phase 4 documentation:
+  - `docs/learning/phase-4_projects_backlog_concepts.md` (Fibonacci, LexoRank, DoD, sequential keys in Hinglish).
+  - `docs/decisions/phase-4_decisions.md` (ADRs 011-014).
+  - `docs/phase-reports/phase-4_completion.md`.
+
 ## [0.3.0] - 2026-11-19 - Phase 3: Workspaces & Multi-Tenancy Isolation
 ### Added
 - Enterprise Multi-Tenancy modular app: `apps.workspaces`.

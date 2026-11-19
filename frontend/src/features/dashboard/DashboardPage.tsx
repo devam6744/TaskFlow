@@ -27,6 +27,8 @@ import { QuickSearchModal } from './components/QuickSearchModal';
 import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 import { CreateWorkspaceModal } from '../workspaces/CreateWorkspaceModal';
 import { WorkspaceMembersModal } from '../workspaces/WorkspaceMembersModal';
+import { BacklogPage } from '../backlog/BacklogPage';
+import { useProjectStore } from '../../stores/projectStore';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -34,8 +36,9 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   const { activeWorkspace, workspaces, fetchWorkspaces } = useWorkspaceStore();
+  const { projects, fetchProjects } = useProjectStore();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'kanban'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'backlog'>('overview');
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
@@ -46,6 +49,13 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     fetchWorkspaces();
   }, [fetchWorkspaces]);
+
+  // Fetch projects when active workspace changes
+  useEffect(() => {
+    if (activeWorkspace) {
+      fetchProjects(activeWorkspace.slug);
+    }
+  }, [activeWorkspace, fetchProjects]);
 
   // Global keyboard shortcut listener for Ctrl+K / Cmd+K
   useEffect(() => {
@@ -188,6 +198,28 @@ export const DashboardPage: React.FC = () => {
 
                 <button
                   onClick={() => {
+                    setActiveTab('backlog');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === 'backlog'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <FolderGit2 className="w-4 h-4 text-blue-600" />
+                    <span>Projects & Backlog</span>
+                  </div>
+                  {projects.length > 0 && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">
+                      {projects.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
                     setActiveTab('kanban');
                     setMobileSidebarOpen(false);
                   }}
@@ -237,12 +269,14 @@ export const DashboardPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 cursor-not-allowed">
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-50/60 border border-emerald-100 text-emerald-900 font-medium">
                   <div className="flex items-center gap-3">
-                    <FolderGit2 className="w-4 h-4 text-slate-400" />
+                    <FolderGit2 className="w-4 h-4 text-emerald-600" />
                     <span>Projects & Backlog</span>
                   </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">P4</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                    Phase 4 Active
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 cursor-not-allowed">
@@ -349,13 +383,22 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            {/* Metrics KPI Cards */}
-            <MetricsCards />
+            {activeTab === 'backlog' && <BacklogPage />}
 
-            {/* Interactive Sprint Kanban Board */}
-            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <KanbanBoard />
-            </div>
+            {activeTab === 'overview' && (
+              <>
+                <MetricsCards />
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <KanbanBoard />
+                </div>
+              </>
+            )}
+
+            {activeTab === 'kanban' && (
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <KanbanBoard />
+              </div>
+            )}
           </div>
         </main>
       </div>
