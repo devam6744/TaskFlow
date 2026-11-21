@@ -25,6 +25,7 @@ import {
   X,
   Loader2,
   Play,
+  Kanban,
 } from 'lucide-react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useBacklogStore, type WorkItem } from '../../stores/backlogStore';
@@ -38,7 +39,11 @@ import { StartSprintModal } from '../sprints/StartSprintModal';
 
 const FIBONACCI_POINTS = [1, 2, 3, 5, 8, 13, 21];
 
-export const BacklogPage: React.FC = () => {
+interface BacklogPageProps {
+  onNavigateToBoard?: () => void;
+}
+
+export const BacklogPage: React.FC<BacklogPageProps> = ({ onNavigateToBoard }) => {
   const { activeWorkspace } = useWorkspaceStore();
   const { projects, activeProject, fetchProjects, setActiveProject } = useProjectStore();
   const {
@@ -55,6 +60,11 @@ export const BacklogPage: React.FC = () => {
     addItemsToSprint,
   } = useSprintStore();
   const addToast = useToast((state) => state.addToast);
+
+  // Bulk Selection & Assignment State
+  const [selectedItemNumbers, setSelectedItemNumbers] = useState<number[]>([]);
+  const [bulkSprintId, setBulkSprintId] = useState<string>('');
+  const [isBulkAssigning, setIsBulkAssigning] = useState<boolean>(false);
 
   // Modals state
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
@@ -126,18 +136,65 @@ export const BacklogPage: React.FC = () => {
     if (!activeWorkspace || !activeProject) return;
     try {
       await addItemsToSprint(activeWorkspace.slug, activeProject.slug, sprintId, [itemNumber]);
+      const targetSprint = sprints.find((s) => s.id === sprintId);
       addToast({
         type: 'success',
         title: 'Assigned to Sprint',
-        description: 'Item committed to sprint plan.',
+        description: `Item committed to "${targetSprint?.name || 'Sprint'}".`,
       });
-      fetchBacklog(activeWorkspace.slug, activeProject.slug);
+      await fetchBacklog(activeWorkspace.slug, activeProject.slug);
+      if (targetSprint?.status === 'ACTIVE' && onNavigateToBoard) {
+        onNavigateToBoard();
+      }
     } catch (err: any) {
       addToast({
         type: 'error',
         title: 'Assignment Failed',
         description: err.message || 'Could not add item to sprint.',
       });
+    }
+  };
+
+  // Bulk Selection & Assignment Handlers
+  const toggleSelectItem = (itemNumber: number) => {
+    setSelectedItemNumbers((prev) =>
+      prev.includes(itemNumber) ? prev.filter((n) => n !== itemNumber) : [...prev, itemNumber]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedItemNumbers.length === filteredItems.length) {
+      setSelectedItemNumbers([]);
+    } else {
+      setSelectedItemNumbers(filteredItems.map((item) => item.item_number));
+    }
+  };
+
+  const handleBulkAssignToSprint = async () => {
+    if (!activeWorkspace || !activeProject || !bulkSprintId || selectedItemNumbers.length === 0) return;
+    setIsBulkAssigning(true);
+    try {
+      await addItemsToSprint(activeWorkspace.slug, activeProject.slug, bulkSprintId, selectedItemNumbers);
+      const targetSprint = sprints.find((s) => s.id === bulkSprintId);
+      addToast({
+        type: 'success',
+        title: 'Bulk Assignment Complete',
+        description: `${selectedItemNumbers.length} items moved to "${targetSprint?.name || 'Sprint'}".`,
+      });
+      setSelectedItemNumbers([]);
+      setBulkSprintId('');
+      await fetchBacklog(activeWorkspace.slug, activeProject.slug);
+      if (targetSprint?.status === 'ACTIVE' && onNavigateToBoard) {
+        onNavigateToBoard();
+      }
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Bulk Assignment Failed',
+        description: err.message || 'Could not move items to sprint.',
+      });
+    } finally {
+      setIsBulkAssigning(false);
     }
   };
 
@@ -712,6 +769,17 @@ export const BacklogPage: React.FC = () => {
                               <span>Start Sprint</span>
                             </button>
                           )}
+
+                          {sprint.status === 'ACTIVE' && (
+                            <button
+                              type="button"
+                              onClick={onNavigateToBoard}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <Kanban className="w-3 h-3 text-white" />
+                              <span>Open Sprint Board</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -729,16 +797,72 @@ export const BacklogPage: React.FC = () => {
           {/* Backlog Items List Container */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Product Backlog Order (LexoRank Priority)
-                </span>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={filteredItems.length > 0 && selectedItemNumbers.length === filteredItems.length}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                  title="Select all items"
+                  aria-label="Select all items"
+                />
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Product Backlog Order (LexoRank Priority)
+                  </span>
+                </div>
               </div>
               <span className="text-[11px] font-mono text-slate-500">
                 {filteredItems.length} items
               </span>
             </div>
+
+            {/* Bulk Action Bar (Visible when items selected) */}
+            {selectedItemNumbers.length > 0 && (
+              <div className="bg-blue-50 border-b border-blue-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in duration-150">
+                <div className="flex items-center gap-2 text-blue-900 font-semibold">
+                  <CheckSquare className="w-4 h-4 text-blue-600" />
+                  <span>{selectedItemNumbers.length} work items selected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={bulkSprintId}
+                    onChange={(e) => setBulkSprintId(e.target.value)}
+                    className="text-xs font-semibold text-slate-700 bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-600/20 cursor-pointer"
+                  >
+                    <option value="">Move All to Sprint...</option>
+                    {sprints
+                      .filter((s) => s.status !== 'COMPLETED' && s.status !== 'CANCELLED')
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.status})
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!bulkSprintId || isBulkAssigning}
+                    onClick={handleBulkAssignToSprint}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                  >
+                    {isBulkAssigning ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                    )}
+                    <span>Move {selectedItemNumbers.length} Items</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemNumbers([])}
+                    className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-blue-100/50 cursor-pointer transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isBacklogLoading && workItems.length === 0 ? (
               <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 text-xs">
@@ -765,6 +889,16 @@ export const BacklogPage: React.FC = () => {
                     onClick={() => setSelectedItem(item)}
                     className="p-3.5 sm:px-4 sm:py-3 hover:bg-slate-50/80 transition-colors flex items-center gap-2 sm:gap-3 group cursor-pointer"
                   >
+                    {/* Item Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedItemNumbers.includes(item.item_number)}
+                      onChange={() => toggleSelectItem(item.item_number)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer shrink-0"
+                      aria-label={`Select ${item.key_identifier}`}
+                    />
+
                     {/* Reorder Grip & Arrows (Mobile + Touch Friendly) */}
                     <div
                       className="flex items-center gap-0.5 text-slate-300 group-hover:text-slate-500 shrink-0"
@@ -935,6 +1069,7 @@ export const BacklogPage: React.FC = () => {
           onSprintStarted={() => {
             fetchSprints(activeWorkspace.slug, activeProject.slug);
             fetchBacklog(activeWorkspace.slug, activeProject.slug);
+            if (onNavigateToBoard) onNavigateToBoard();
           }}
         />
       )}

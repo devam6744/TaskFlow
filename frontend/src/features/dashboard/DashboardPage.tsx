@@ -31,6 +31,7 @@ import { CreateWorkspaceModal } from '../workspaces/CreateWorkspaceModal';
 import { WorkspaceMembersModal } from '../workspaces/WorkspaceMembersModal';
 import { BacklogPage } from '../backlog/BacklogPage';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSprintStore } from '../../stores/sprintStore';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -38,7 +39,8 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   const { activeWorkspace, workspaces, fetchWorkspaces } = useWorkspaceStore();
-  const { projects, fetchProjects } = useProjectStore();
+  const { projects, activeProject, fetchProjects } = useProjectStore();
+  const { activeSprint, fetchBoard } = useSprintStore();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'backlog'>('overview');
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -59,6 +61,13 @@ export const DashboardPage: React.FC = () => {
       fetchProjects(activeWorkspace.slug);
     }
   }, [activeWorkspace, fetchProjects]);
+
+  // Fetch active sprint board when project changes
+  useEffect(() => {
+    if (activeWorkspace && activeProject) {
+      fetchBoard(activeWorkspace.slug, activeProject.slug);
+    }
+  }, [activeWorkspace, activeProject, fetchBoard]);
 
   // Global keyboard shortcut listener for Ctrl+K / Cmd+K
   useEffect(() => {
@@ -231,14 +240,26 @@ export const DashboardPage: React.FC = () => {
                     setActiveTab('kanban');
                     setMobileSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === 'kanban'
                       ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
-                  <Kanban className="w-4 h-4 text-blue-600" />
-                  <span>Active Sprint Board</span>
+                  <div className="flex items-center gap-3">
+                    <Kanban className="w-4 h-4 text-blue-600" />
+                    <span>Active Sprint Board</span>
+                  </div>
+                  {activeSprint ? (
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Active</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">
+                      0
+                    </span>
+                  )}
                 </button>
 
                 {activeWorkspace && (
@@ -436,7 +457,9 @@ export const DashboardPage: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'backlog' && <BacklogPage />}
+            {activeTab === 'backlog' && (
+              <BacklogPage onNavigateToBoard={() => setActiveTab('kanban')} />
+            )}
 
             {activeTab === 'overview' && (
               <>
