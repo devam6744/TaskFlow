@@ -33,12 +33,14 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'drf_spectacular',
+    'django_celery_beat',
 
     # TaskFlow Modular Apps
     'apps.accounts',
     'apps.workspaces',
     'apps.projects',
     'apps.collaboration',
+    'apps.notifications',
 ]
 
 # Custom User Model (Mandatory before first migration)
@@ -184,4 +186,45 @@ CACHES = {
 # Security Headers (Defense in Depth)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Celery Configuration (Upstash Redis with TLS support)
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Upstash TLS configuration (rediss://)
+if CELERY_BROKER_URL.startswith('rediss://'):
+    import ssl
+    CELERY_BROKER_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
+    CELERY_REDIS_BACKEND_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
+
+# Celery Beat Database Scheduler
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Eager task execution during automated tests
+if 'test' in sys.argv:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
+# Email Configuration (Gmail SMTP with automatic App Password space sanitizer)
+EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'smtp').lower()
+
+if EMAIL_PROVIDER == 'smtp':
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '').strip()
+    # Strip spaces automatically so Gmail App Passwords (e.g. "abcd efgh ijkl mnop") work seamlessly
+    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '').replace(' ', '').strip()
+    DEFAULT_FROM_EMAIL = os.getenv('EMAIL_FROM', EMAIL_HOST_USER or 'noreply@taskflow.dev')
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = os.getenv('EMAIL_FROM', 'noreply@taskflow.dev')
+
 

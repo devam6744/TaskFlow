@@ -1,0 +1,15 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">New comment on your work item</h2>
+
+<p>Hello <strong>{{ recipient.display_name }}</strong>,</p>
+
+<p><strong>{{ actor.display_name|default:"A teammate" }}</strong> posted a comment on <strong>{{ item_key }}: {{ item_title }}</strong>:</p>
+
+<div style="background-color: #f8fafc; border-left: 4px solid #64748b; padding: 16px; margin: 20px 0; border-radius: 4px; font-style: italic; color: #334155;">
+  "{{ comment_preview }}"
+</div>
+
+<a href="{{ action_url }}" class="action-button">Reply in Discussion Thread &rarr;</a>
+{% endblock %}

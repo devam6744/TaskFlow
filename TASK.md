@@ -188,23 +188,61 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 7 — Notifications & Background Processing (NEXT)
-- [ ] Implement `apps/notifications` app and `Notification` model (UUID PK, recipient FK, actor FK, event_type, target_url, read_at)
-- [ ] Implement Notification preferences & digest options
-- [ ] Celery / Background task queue integration for async dispatch
-- [ ] In-app notification bell icon with badge count & dropdown list in header
-- [ ] Mark as read / mark all as read API endpoints
-- [ ] Email dispatch service stub with transactional templates
+## 🏁 Phase 7: Notifications & Background Processing (COMPLETED ✅)
+- [x] Integrate Celery 5.x and Upstash Managed Serverless Redis over TLS (`rediss://`)
+- [x] Configure Gmail SMTP with automatic whitespace/chunk sanitation for Google App Passwords (`replace(" ", "").strip()`)
+- [x] Create modular Django app `apps/notifications`
+- [x] Implement `Notification` model (UUID PK, recipient FK, actor FK, workspace FK, event_type, title, description, target_url, payload, read_at, email_sent_at, email_status, idempotency_key)
+- [x] Implement `NotificationPreference` model (user FK, workspace FK, event_type, in_app_enabled, email_enabled)
+- [x] Apply migrations to live Supabase PostgreSQL 17 (`notifications.0001_initial` and `django_celery_beat`)
+- [x] Create 5 responsive HTML email templates (`base_email`, `task_assigned`, `sprint_started`, `task_overdue`, `comment_added`, `workspace_invite`)
+- [x] Implement Celery tasks in `apps/notifications/tasks.py`:
+  - `dispatch_notification_task` (async notification creation with preference checking)
+  - `send_email_task` (SMTP delivery with exponential backoff retries)
+  - `send_invitation_email_task` (workspace invite delivery)
+  - `check_overdue_tasks` (Celery Beat periodic daily cron)
+- [x] Implement Service layer (`apps/notifications/services.py`) with deterministic SHA-256 idempotency key deduplication
+- [x] Implement Selectors (`apps/notifications/selectors.py`) with `select_related('actor', 'workspace')` to eliminate N+1 queries
+- [x] Wire asynchronous notification triggers into:
+  - `apps.workspaces.services.invite_member` (workspace invite)
+  - `apps.collaboration.services.add_comment` (comment notification to assignee)
+  - `apps.projects.services.update_work_item` (task assignment notification)
+  - `apps.projects.services.start_sprint` (sprint started notification to members)
+- [x] Implement REST API endpoints mounted under `/api/v1/notifications/`:
+  - `GET /` (list user notifications in workspace)
+  - `GET /unread-count/` (lightweight bell badge count)
+  - `POST /{id}/read/` (mark single notification read)
+  - `POST /read-all/` (bulk mark all read)
+  - `GET /preferences/` & `PATCH /preferences/` (manage in-app and email preferences)
+- [x] Automated test suite (`apps/notifications/tests/test_notifications_api.py`) — 9/9 tests passing (full test suite: 50/50 passing)
+- [x] OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors, 0 warnings)
+- [x] Frontend Executive Light-Theme Notification Center:
+  - Google Stitch-grade executive light theme (`slate-50`, crisp white popover, `slate-200` borders, `blue-600` accents)
+  - Zero Emojis Policy strictly enforced (100% SVG Lucide React icons)
+  - `NotificationBell.tsx`: Interactive bell icon with animated red unread pill badge, 30s polling, relative timestamps, event icons, and "Mark all read" button
+  - `NotificationPreferencesModal.tsx`: User modal to toggle In-App and Email alerts per event type
+  - Reactive Zustand notification store (`stores/notificationStore.ts`)
+  - Verified frontend production build (`npm run build` in 5.77s)
+- [x] Comprehensive documentation:
+  - `docs/learning/phase-7_notifications_concepts.md` (Upstash Redis TLS, Celery architecture, idempotency keys, Gmail SMTP sanitation in Hinglish)
+  - `docs/decisions/phase-7_decisions.md` (ADRs 023-026)
+  - `docs/phase-reports/phase-7_completion.md`
 
+---
+
+## 🚀 Active Milestone: Phase 8 — Real-Time Updates & WebSockets (NEXT)
+- [ ] Install & configure Django Channels with Upstash Redis Channel Layer (`channels_redis`)
+- [ ] Implement ASGI application entrypoint in `backend/config/asgi.py`
+- [ ] Implement WebSocket Consumers for Workspaces and Projects (`WorkItemConsumer`, `SprintConsumer`)
+- [ ] Implement WebSocket Authentication middleware (JWT Bearer query param or cookie validation)
+- [ ] Connect Django Service Layer event signals to Channel Layer group broadcasts
+- [ ] Frontend WebSocket connection manager and Zustand store subscription for real-time Kanban board updates (drag-and-drop card sync across active sessions)
+- [ ] Real-time notification badge increment via WebSocket without polling
 
 ---
 
 ## 📅 Upcoming Phases
-- **Phase 4: Projects & Product Backlog**
-- **Phase 5: Sprint Lifecycle & Kanban Board**
-- **Phase 6: Collaboration & Attachments**
-- **Phase 7: Notifications & Background Processing**
-- **Phase 8: Real-Time Updates**
-- **Phase 9: Sprint Reports & Global Search**
-- **Phase 10: Release Hardening & Deployment**
-- **Phase v2: Enterprise AI & Integrations**
+- **Phase 8: Real-Time Updates & WebSockets**
+- **Phase 9: Sprint Analytics, Burndown Charts & Global Search**
+- **Phase 10: Release Hardening, Dockerization & Production Deployment**
+- **Phase v2: Enterprise AI Copilot & Integrations**

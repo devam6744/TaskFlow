@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">You've been assigned to a work item</h2>
+
+<p>Hello <strong>{{ recipient.display_name }}</strong>,</p>
+
+<p><strong>{{ actor.display_name|default:"A team member" }}</strong> has assigned you to the following work item in project <strong>{{ project_name }}</strong>:</p>
+
+<div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 16px; margin: 20px 0; border-radius: 4px;">
+  <div style="font-size: 13px; font-weight: 700; color: #2563eb; font-family: monospace;">{{ item_key }}</div>
+  <div style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 4px;">{{ item_title }}</div>
+  {% if item_priority %}
+  <div style="font-size: 12px; color: #64748b; margin-top: 8px;">Priority: <strong>{{ item_priority }}</strong></div>
+  {% endif %}
+</div>
+
+<a href="{{ action_url }}" class="action-button">View Work Item in TaskFlow &rarr;</a>
+
+<p style="color: #64748b; font-size: 13px;">Need to discuss this item? Open the ticket in TaskFlow to leave comments or review acceptance criteria.</p>
+{% endblock %}

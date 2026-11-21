@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">Sprint Started &bull; {{ sprint_name }}</h2>
+
+<p>Hello <strong>{{ recipient.display_name }}</strong>,</p>
+
+<p><strong>{{ actor.display_name|default:"A project lead" }}</strong> has officially activated <strong>{{ sprint_name }}</strong> in project <strong>{{ project_name }}</strong>.</p>
+
+<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; margin: 20px 0; border-radius: 8px;">
+  <div style="font-size: 14px; font-weight: 600; color: #0f172a;">Sprint Goal:</div>
+  <div style="font-size: 14px; color: #334155; font-style: italic; margin-top: 4px;">"{{ sprint_goal|default:'Deliver committed sprint backlog' }}"</div>
+  <div style="margin-top: 12px; font-size: 13px; color: #64748b;">
+    Committed Points: <strong>{{ planned_points|default:'0' }} pts</strong> &bull; Total Items: <strong>{{ total_items|default:'0' }}</strong>
+  </div>
+</div>
+
+<a href="{{ action_url }}" class="action-button">Go to Active Sprint Board &rarr;</a>
+
+<p style="color: #64748b; font-size: 13px;">Review the board swimlanes to pick up your assigned stories and tasks.</p>
+{% endblock %}

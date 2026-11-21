@@ -5,6 +5,57 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-11-21 - Phase 7: Notifications & Background Processing
+### Added
+- Asynchronous task processing architecture with Celery 5.x and Upstash Managed Serverless Redis over TLS (`rediss://`).
+- Gmail SMTP integration with automatic whitespace and chunk sanitation for Google App Passwords (`replace(" ", "").strip()`).
+- In-memory mock email backend fallback during automated test suites (`locmem`).
+- Enterprise Notifications modular app: `apps.notifications`.
+- Data models:
+  - `Notification`: In-app & email notification model, UUID PK, `recipient` FK, `actor` FK, `workspace` FK, `event_type`, `title`, `description`, `target_url`, `payload` JSONField, `read_at`, `email_sent_at`, `email_status`, and unique `idempotency_key`.
+  - `NotificationPreference`: Granular notification matrix per user and workspace (`in_app_enabled`, `email_enabled`) across all event types.
+- Database migrations applied to live Supabase PostgreSQL 17:
+  - `apps/notifications/migrations/0001_initial.py`
+  - `django_celery_beat` tables for periodic background task scheduling.
+- 5 responsive HTML email templates with professional layout:
+  - `base_email.html`
+  - `task_assigned.html`
+  - `sprint_started.html`
+  - `task_overdue.html`
+  - `comment_added.html`
+  - `workspace_invite.html`
+- Celery background tasks in `apps/notifications/tasks.py`:
+  - `dispatch_notification_task`: Non-blocking async notification persistence and email dispatch.
+  - `send_email_task`: Transactional SMTP delivery with exponential backoff retries (max 3 retries).
+  - `send_invitation_email_task`: Dedicated invitation delivery pipeline.
+  - `check_overdue_tasks`: Celery Beat periodic midnight cron identifying overdue tasks.
+- Service Layer (`apps.notifications.services`):
+  - `create_notification`: Idempotent notification creator with SHA-256 deduplication and user preference checking.
+  - `mark_notification_read` & `mark_all_notifications_read`: Workspace-scoped read state updates.
+  - `get_user_preferences` & `update_user_preference`: Granular channel control.
+- Domain event hooks with `transaction.on_commit()` safety:
+  - `apps.workspaces.services.invite_member` -> sends invitation email.
+  - `apps.collaboration.services.add_comment` -> dispatches notification to ticket assignee.
+  - `apps.projects.services.update_work_item` -> dispatches task assigned notification.
+  - `apps.projects.services.start_sprint` -> dispatches sprint started notification to project members.
+- REST API Endpoints mounted under `/api/v1/notifications/`:
+  - `GET /`: Paginated list of user notifications.
+  - `GET /unread-count/`: Lightweight bell counter.
+  - `POST /{id}/read/`: Single notification mark-read.
+  - `POST /read-all/`: Bulk mark-all-read.
+  - `GET /preferences/` & `PATCH /preferences/`: View and toggle alert preferences.
+- Automated unit test suite (`apps/notifications/tests/test_notifications_api.py`): 9/9 tests passing (Full suite: 50/50 passing).
+- OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors, 0 warnings).
+- Frontend Executive Light-Theme Notification Center:
+  - `NotificationBell.tsx`: Interactive header bell icon with unread count pill badge, 30s background polling, relative timestamps, Lucide SVG event icons, and "Mark all read" action.
+  - `NotificationPreferencesModal.tsx`: Preference manager modal to toggle In-App and Email alerts per event type.
+  - Reactive Zustand notification store (`stores/notificationStore.ts`).
+  - Verified production build (`npm run build` in 5.77s).
+- Comprehensive Phase 7 documentation:
+  - `docs/learning/phase-7_notifications_concepts.md`
+  - `docs/decisions/phase-7_decisions.md` (ADRs 023-026)
+  - `docs/phase-reports/phase-7_completion.md`
+
 ## [0.6.0] - 2026-11-19 - Phase 6: Collaboration, Discussion Threads, Attachments & Activity Trail
 ### Added
 - Enterprise Collaboration modular app: `apps.collaboration`.

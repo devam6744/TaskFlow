@@ -76,6 +76,31 @@ def add_comment(*, work_item: WorkItem, author, body: str) -> Comment:
         }
     )
 
+    # If work item has an assignee and they are not the comment author, dispatch notification
+    if work_item.assignee and work_item.assignee_id != author.id:
+        try:
+            from apps.notifications.tasks import dispatch_notification_task
+            target_url = f"/dashboard"
+            actor_name = getattr(author, 'display_name', author.email)
+            transaction.on_commit(lambda: dispatch_notification_task.delay(
+                recipient_id=str(work_item.assignee.id),
+                actor_id=str(author.id),
+                workspace_id=str(work_item.project.workspace_id) if work_item.project.workspace_id else None,
+                event_type='COMMENT_ADDED',
+                title=f"New comment on {work_item.key_identifier}: {work_item.title}",
+                description=f"{actor_name} commented: \"{cleaned_body[:60]}...\"",
+                target_url=target_url,
+                payload={
+                    'item_key': work_item.key_identifier,
+                    'item_title': work_item.title,
+                    'comment_preview': cleaned_body[:100],
+                    'project_name': work_item.project.name,
+                },
+                idempotency_key=f"COMMENT_ADDED:{comment.id}"
+            ))
+        except Exception:
+            pass
+
     return comment
 
 

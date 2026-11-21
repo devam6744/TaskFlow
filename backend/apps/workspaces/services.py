@@ -114,6 +114,13 @@ def invite_member(
         expires_at=expires_at
     )
 
+    # Dispatch asynchronous invitation email via Celery
+    try:
+        from apps.notifications.tasks import send_invitation_email_task
+        transaction.on_commit(lambda: send_invitation_email_task.delay(str(invite.id)))
+    except Exception:
+        pass
+
     return invite, raw_token
 
 

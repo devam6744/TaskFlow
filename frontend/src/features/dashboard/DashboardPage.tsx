@@ -24,6 +24,8 @@ import { MetricsCards } from './components/MetricsCards';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ProfileModal } from './components/ProfileModal';
 import { QuickSearchModal } from './components/QuickSearchModal';
+import { NotificationBell } from './components/NotificationBell';
+import { NotificationPreferencesModal } from './components/NotificationPreferencesModal';
 import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 import { CreateWorkspaceModal } from '../workspaces/CreateWorkspaceModal';
 import { WorkspaceMembersModal } from '../workspaces/WorkspaceMembersModal';
@@ -43,6 +45,7 @@ export const DashboardPage: React.FC = () => {
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
   const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Initial load: fetch workspaces
@@ -136,8 +139,13 @@ export const DashboardPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Right: Search icon on mobile + Profile Button */}
+        {/* Right: Notifications + Search icon on mobile + Profile Button */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <NotificationBell
+            onOpenSettings={() => setPreferencesModalOpen(true)}
+            onNavigateToWorkItem={() => setActiveTab('backlog')}
+          />
+
           <button
             onClick={() => setQuickSearchOpen(true)}
             className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
@@ -475,6 +483,12 @@ export const DashboardPage: React.FC = () => {
       <WorkspaceMembersModal
         isOpen={membersModalOpen}
         onClose={() => setMembersModalOpen(false)}
+      />
+
+      {/* Notification Preferences Modal */}
+      <NotificationPreferencesModal
+        isOpen={preferencesModalOpen}
+        onClose={() => setPreferencesModalOpen(false)}
       />
     </div>
   );

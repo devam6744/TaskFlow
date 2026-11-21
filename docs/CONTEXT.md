@@ -1,7 +1,7 @@
 # TaskFlow — System Architecture & Context Handoff Guide
 
 > **Target Audience:** Any AI model, engineer, or contributor picking up development on this repository.
-> **Last Updated:** Phase 6 (Collaboration, Discussion Threads, Attachments & Activity Trail)
+> **Last Updated:** Phase 7 (Notifications & Background Processing)
 > **Single Source of Truth:** Refer to [BLUEPRINT.md](file:///c:/Users/maushmi/Desktop/DAJNGO/teampluse/BLUEPRINT.md) for full architectural specs.
 
 ---
@@ -18,6 +18,9 @@
 | **Language & Runtime** | Python (Backend) / Node.js (Frontend) | Python 3.14 / Node 24 |
 | **Backend Framework** | Django + Django REST Framework | Django 5.1 / DRF 3.15 |
 | **Database** | PostgreSQL (Supabase Hosted) | PostgreSQL 17.12 |
+| **Message Broker & Cache**| Upstash Redis (TLS `rediss://`) | Cloud Serverless Redis |
+| **Background Processing** | Celery + django-celery-beat | Celery 5.4 / Async Tasks & Crons |
+| **Email Deliverability**| Gmail SMTP with Space Sanitation | Google App Passwords / locmem in tests |
 | **Auth & Security** | SimpleJWT + HttpOnly Cookies + Blacklist | Access (15m) + Refresh (7d) with rotation |
 | **Multi-Tenancy** | Row-Level Workspace Scoping + RBAC | Owner, Admin, Member, Viewer roles |
 | **Frontend Framework** | React 19 + TypeScript | Vite 8 + React 19 |
@@ -41,23 +44,33 @@ TaskFlow/
 │   │   │   ├── selectors.py   # Scoped project, sprint, board & backlog queries
 │   │   │   ├── permissions.py # Project-level RBAC & private project isolation
 │   │   │   └── tests/         # test_projects_and_backlog (7 tests), test_sprints_and_kanban (7 tests)
-│   │   └── collaboration/     # Phase 6: Comments, Attachments, ActivityEvent Audit Trail
-│   │       ├── api/           # Serializers, Views (Comments, Attachments, Activity, Dependencies), URLs
-│   │       ├── models.py      # Comment (soft-delete), Attachment (10MB limit), ActivityEvent (polymorphic)
-│   │       ├── services.py    # add_comment, upload_attachment, soft delete, activity logging
-│   │       ├── selectors.py   # select_related scoped querysets
-│   │       └── tests/         # test_collaboration_api (8 tests)
+│   │   ├── collaboration/     # Phase 6: Comments, Attachments, ActivityEvent Audit Trail
+│   │   │   ├── api/           # Serializers, Views (Comments, Attachments, Activity, Dependencies), URLs
+│   │   │   ├── models.py      # Comment (soft-delete), Attachment (10MB limit), ActivityEvent (polymorphic)
+│   │   │   ├── services.py    # add_comment, upload_attachment, soft delete, activity logging
+│   │   │   ├── selectors.py   # select_related scoped querysets
+│   │   │   └── tests/         # test_collaboration_api (8 tests)
+│   │   └── notifications/     # Phase 7: Notifications & Background Processing
+│   │       ├── api/           # Serializers, Views (List, Unread Count, Mark Read, Preferences), URLs
+│   │       ├── models.py      # Notification (idempotent), NotificationPreference (in-app/email toggles)
+│   │       ├── services.py    # create_notification (SHA-256 dedupe), mark read, preferences
+│   │       ├── tasks.py       # Celery tasks: dispatch_notification, send_email, check_overdue_tasks
+│   │       ├── selectors.py   # select_related scoped querysets & unread counts
+│   │       └── tests/         # test_notifications_api (9 tests)
 │   ├── config/
 │   │   ├── settings/
-│   │   │   └── base.py        # Django config, DB url, SimpleJWT, CORS
+│   │   │   └── base.py        # Django config, Celery broker, DB url, SimpleJWT, CORS
+│   │   ├── celery.py          # Celery app initialization & autodiscover
 │   │   ├── urls.py            # Root URL routing + Swagger docs
 │   │   └── wsgi.py
+│   ├── templates/
+│   │   └── emails/            # 5 HTML responsive email templates
 │   └── manage.py
 ├── frontend/
 │   ├── src/
 │   │   ├── features/
 │   │   │   ├── auth/          # Unified AuthPage, ProtectedRoute
-│   │   │   ├── dashboard/     # DashboardPage, Metrics, KanbanBoard (drag-and-drop & touch arrows), QuickSearch (Ctrl+K)
+│   │   │   ├── dashboard/     # DashboardPage, NotificationBell, NotificationPreferencesModal, KanbanBoard
 │   │   │   ├── landing/       # LandingPage, Hero, Features, Workflow, Security
 │   │   │   ├── workspaces/    # WorkspaceSwitcher, CreateModal, MembersModal, JoinPage
 │   │   │   ├── projects/      # CreateProjectModal
@@ -71,6 +84,8 @@ TaskFlow/
 │   │   │   ├── projectStore.ts   # Zustand projects & active project state
 │   │   │   ├── backlogStore.ts   # Zustand backlog & LexoRank reorder state
 │   │   │   ├── sprintStore.ts    # Zustand sprints, active sprint board & card transitions
+│   │   │   ├── collaborationStore.ts # Zustand comments, attachments & activity
+│   │   │   ├── notificationStore.ts  # Zustand notifications, unread count & preferences
 │   │   │   └── toastStore.ts  # Notification toasts
 │   │   ├── App.tsx
 │   │   └── main.tsx
@@ -134,10 +149,17 @@ TaskFlow/
 | `GET` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/dependencies/` | List work item blocker dependencies | Yes (Member) |
 | `POST` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/dependencies/` | Add blocker (DFS cycle detected) | Yes (Member) |
 | `DELETE` | `/api/v1/workspaces/{slug}/projects/{project_slug}/items/{num}/dependencies/{id}/` | Remove blocker dependency | Yes (Member) |
+| `GET` | `/api/v1/notifications/` | List current user's notifications in workspace | Yes |
+| `GET` | `/api/v1/notifications/unread-count/` | Unread notifications count badge | Yes |
+| `POST` | `/api/v1/notifications/{id}/read/` | Mark single notification as read | Yes |
+| `POST` | `/api/v1/notifications/read-all/` | Bulk mark all notifications as read | Yes |
+| `GET` | `/api/v1/notifications/preferences/` | Get user notification preferences matrix | Yes |
+| `PATCH` | `/api/v1/notifications/preferences/` | Update user notification preference (in-app / email) | Yes |
 | `GET` | `/api/docs/` | Swagger OpenAPI UI | No |
 
 ---
 
 ## 5. Next Planned Work (SDLC Roadmap)
-- **Phase 7:** Notifications & Background Processing (In-app alerts, Celery / Redis asynchronous tasks).
-- **Phase 8:** Real-Time Updates (WebSockets / Server-Sent Events for instant board card movement).
+- **Phase 8:** Real-Time Updates & WebSockets (Django Channels + Upstash Redis channel layer for real-time Kanban sync & live notification counter).
+- **Phase 9:** Sprint Analytics, Velocity Burndown Charts & Global Search.
+- **Phase 10:** Release Hardening, Dockerization & Production Deployment.

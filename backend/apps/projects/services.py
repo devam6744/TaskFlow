@@ -312,11 +312,39 @@ def update_work_item(work_item: WorkItem, user, **fields) -> WorkItem:
                 'story_points': f'Story points must be one of {FIBONACCI_STORY_POINTS}.'
             })
 
+    old_assignee_id = work_item.assignee_id
+
     for field, value in fields.items():
         if hasattr(work_item, field) and field not in ['id', 'project', 'item_number', 'reporter', 'created_at']:
             setattr(work_item, field, value)
 
     work_item.save()
+
+    # Trigger TASK_ASSIGNED notification if assignee was set or updated
+    new_assignee = work_item.assignee
+    if new_assignee and (new_assignee.id != old_assignee_id) and (new_assignee.id != user.id):
+        try:
+            from apps.notifications.tasks import dispatch_notification_task
+            actor_name = getattr(user, 'display_name', user.email)
+            transaction.on_commit(lambda: dispatch_notification_task.delay(
+                recipient_id=str(new_assignee.id),
+                actor_id=str(user.id),
+                workspace_id=str(work_item.project.workspace_id) if work_item.project.workspace_id else None,
+                event_type='TASK_ASSIGNED',
+                title=f"Assigned to {work_item.key_identifier}: {work_item.title}",
+                description=f"{actor_name} assigned this work item to you in {work_item.project.name}.",
+                target_url=f"/dashboard",
+                payload={
+                    'item_key': work_item.key_identifier,
+                    'item_title': work_item.title,
+                    'item_priority': work_item.priority,
+                    'project_name': work_item.project.name,
+                },
+                idempotency_key=f"TASK_ASSIGNED:{work_item.id}:{new_assignee.id}:{timezone.now().strftime('%Y-%m-%d-%H%M')}"
+            ))
+        except Exception:
+            pass
+
     return work_item
 
 
@@ -463,6 +491,31 @@ def start_sprint(
 
     # Move items currently in BACKLOG to TODO for active sprint execution
     sprint.work_items.filter(status=WorkItem.Status.BACKLOG).update(status=WorkItem.Status.TODO)
+
+    # Notify project members of sprint activation
+    try:
+        from apps.notifications.tasks import dispatch_notification_task
+        member_user_ids = list(sprint.project.members.exclude(user=user).values_list('user_id', flat=True))
+        for m_id in member_user_ids:
+            transaction.on_commit(lambda member_id=m_id: dispatch_notification_task.delay(
+                recipient_id=str(member_id),
+                actor_id=str(user.id),
+                workspace_id=str(sprint.project.workspace_id) if sprint.project.workspace_id else None,
+                event_type='SPRINT_STARTED',
+                title=f"Sprint Started: {sprint.name}",
+                description=f"{sprint.name} is now ACTIVE with goal: \"{sprint.sprint_goal}\"",
+                target_url=f"/dashboard",
+                payload={
+                    'sprint_name': sprint.name,
+                    'sprint_goal': sprint.sprint_goal,
+                    'planned_points': sprint.planned_story_points,
+                    'total_items': sprint.work_items.count(),
+                    'project_name': sprint.project.name,
+                },
+                idempotency_key=f"SPRINT_STARTED:{sprint.id}:{member_id}"
+            ))
+    except Exception:
+        pass
 
     return sprint
 
