@@ -5,6 +5,38 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-11-22 - Phase 8: Real-Time Updates & WebSockets
+### Added
+- Daphne ASGI application server integration and protocol routing in `backend/config/asgi.py`.
+- Upstash Redis Channel Layer configuration over TLS (`rediss://`) with robust socket timeout, connect timeout, auto-retry on timeout, and keepalive health check intervals.
+- Real-Time modular app: `apps.realtime`.
+- ASGI JWT Handshake Authentication Middleware (`apps/realtime/middleware.py`) parsing and validating `?token=<jwt>` query parameters with SimpleJWT.
+- Multi-Tenant WebSocket Consumer (`apps/realtime/consumers.py`):
+  - Authenticates connections and maps user to `scope['user']` (rejects unauthenticated with code `4001`).
+  - Verifies active workspace membership against database (rejects non-members with code `4003`).
+  - Scopes clients to isolated Channel Layer groups `workspace_{workspace_id}`.
+  - Heartbeat ping/pong responder for real-time connection health checks.
+  - User-targeted notification filtering via `target_user_id` payload evaluation.
+- Transactional Broadcast Pipeline (`apps/realtime/broadcasts.py`) strictly deferred until database commit via `transaction.on_commit()`.
+- Integrated real-time broadcasts across core service layers:
+  - `apps.projects.services`: `work_item_created`, `work_item_updated`, `work_item_reordered`, `sprint_started`, `sprint_completed`, `sprint_cancelled`.
+  - `apps.collaboration.services`: `comment_added`.
+  - `apps.notifications.services`: `notification_created` (targeted per user).
+- Automated test suite for WebSockets (`apps/realtime/tests/test_websocket.py`):
+  - 5 comprehensive tests with `WebsocketCommunicator` covering authentication, ping/pong, tenant isolation, and targeted delivery.
+  - Full project test suite passing: 60/60 tests (100% pass rate).
+- OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors, 0 warnings).
+- Frontend Real-Time WebSocket Engine & Executive UI:
+  - Reactive Zustand store `stores/realtimeStore.ts` tracking connection status (`connected`, `connecting`, `reconnecting`, `disconnected`) and retry counts.
+  - Resilient hook `features/realtime/useWebSocket.ts` featuring exponential backoff with random jitter, 30s heartbeat ping/pong keepalive, and decoupled store reads (`useProjectStore.getState().activeProject`) to eliminate re-render loops.
+  - Dynamic store cache invalidation for Kanban boards, backlog items, comments, and notification counters.
+  - Executive light-theme `<ConnectionStatus />` navbar badge: 🟢 `Live Sync` (pulsing), 🟡 `Reconnecting (n)` (spinning), ⚪ `REST Mode` (slate fallback).
+  - Production build verified clean (`npm run build` in 2.05s).
+- Documentation Framework:
+  - `docs/learning/phase-8_realtime_concepts.md`: Comprehensive guide covering WebSockets vs Polling, ASGI vs WSGI, Redis channel layers, JWT handshakes, `transaction.on_commit` race prevention, and local multi-device testing methods.
+  - `docs/decisions/phase-8_decisions.md`: Architecture Decision Records ADR 027 through ADR 030.
+  - `docs/phase-reports/phase-8_completion.md`: Milestone completion summary and test metrics.
+
 ## [0.7.0] - 2026-11-21 - Phase 7: Notifications & Background Processing
 ### Added
 - Asynchronous task processing architecture with Celery 5.x and Upstash Managed Serverless Redis over TLS (`rediss://`).

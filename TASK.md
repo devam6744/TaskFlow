@@ -237,19 +237,63 @@
 
 ---
 
-## 🚀 Active Milestone: Phase 8 — Real-Time Updates & WebSockets (NEXT)
-- [ ] Install & configure Django Channels with Upstash Redis Channel Layer (`channels_redis`)
-- [ ] Implement ASGI application entrypoint in `backend/config/asgi.py`
-- [ ] Implement WebSocket Consumers for Workspaces and Projects (`WorkItemConsumer`, `SprintConsumer`)
-- [ ] Implement WebSocket Authentication middleware (JWT Bearer query param or cookie validation)
-- [ ] Connect Django Service Layer event signals to Channel Layer group broadcasts
-- [ ] Frontend WebSocket connection manager and Zustand store subscription for real-time Kanban board updates (drag-and-drop card sync across active sessions)
-- [ ] Real-time notification badge increment via WebSocket without polling
+## 🏁 Phase 8: Real-Time Updates & WebSockets (COMPLETED ✅)
+- [x] Install & configure Django Channels and Daphne ASGI server (`channels>=4.1.0`, `daphne>=4.1.0`, `channels_redis>=4.2.0`, `pytest-asyncio>=0.23.0`)
+- [x] Configure ASGI application entrypoint in `backend/config/asgi.py` with `ProtocolTypeRouter` routing HTTP to Django ASGI and WebSockets to `JWTAuthMiddlewareStack`
+- [x] Configure Upstash Redis Channel Layer over TLS (`rediss://`) with connection keepalive (`socket_timeout: 30`, `socket_connect_timeout: 15`, `retry_on_timeout: True`, `health_check_interval: 15`)
+- [x] Implement WebSocket Authentication middleware (`apps/realtime/middleware.py`) decoding SimpleJWT access token from query param `?token=<jwt>` into `scope['user']`
+- [x] Implement multi-tenant `WorkspaceConsumer` (`apps/realtime/consumers.py`):
+  - Rejects unauthenticated connections with code `4001` (Unauthorized)
+  - Rejects non-workspace members with code `4003` (Forbidden)
+  - Subscribes verified members to isolated Channel group `workspace_{workspace_id}`
+  - Heartbeat ping/pong handler for connection health checks
+  - Targeted notification filtering via `target_user_id`
+- [x] Implement transactional broadcast pipeline (`apps/realtime/broadcasts.py`) strictly wrapped in `transaction.on_commit`
+- [x] Connect Django Service Layer event signals to Channel Layer group broadcasts:
+  - `work_item_created`, `work_item_updated`, `work_item_reordered`
+  - `sprint_started`, `sprint_completed`, `sprint_cancelled`
+  - `comment_added`
+  - `notification_created` (targeted per user)
+- [x] Automated test suite (`apps/realtime/tests/test_websocket.py`) — 5/5 tests passing:
+  - `test_authenticated_member_connect_and_ping_pong`
+  - `test_unauthenticated_connection_rejected`
+  - `test_non_member_forbidden`
+  - `test_cross_tenant_isolation`
+  - `test_targeted_notification_delivery`
+- [x] Full automated test suite regression passing (60/60 tests passing)
+- [x] Frontend Real-Time WebSocket Engine & Executive UI:
+  - Reactive Zustand store `stores/realtimeStore.ts` tracking connection state and retry counts
+  - Resilient hook `features/realtime/useWebSocket.ts` with exponential backoff with random jitter, 30s heartbeat ping/pong, and decoupled store reads
+  - Instant cache invalidation for Kanban boards, backlog items, comments, and notification counters
+  - Executive light-theme `<ConnectionStatus />` navbar badge: 🟢 `Live Sync` (pulsing), 🟡 `Reconnecting (n)`, ⚪ `REST Mode`
+  - Verified frontend production build (`npm run build` in 2.05s)
+- [x] Comprehensive documentation:
+  - `docs/learning/phase-8_realtime_concepts.md` (WebSockets vs Polling, ASGI vs WSGI, Redis channel layers, JWT handshakes, `transaction.on_commit` in Hinglish)
+  - `docs/decisions/phase-8_decisions.md` (ADRs 027-030)
+  - `docs/phase-reports/phase-8_completion.md`
+
+---
+
+## 🚀 Active Milestone: Phase 9 — Sprint Analytics, Burndown Charts & Global Search (NEXT)
+- [ ] Implement Sprint Metrics & Aggregation Engine (`apps/analytics` or `apps/projects/analytics.py`):
+  - Sprint Velocity calculation (committed story points vs completed story points)
+  - Sprint Burndown Chart dataset generator (ideal linear burn line vs actual daily remaining story points)
+  - Cumulative Flow Diagram (CFD) data points (work items across statuses over time)
+  - Work item cycle time & lead time analytics
+- [ ] Implement Trigram / Full-Text Global Search (`apps/search` or `apps/projects/search.py`):
+  - PostgreSQL Full-Text Search / `django.contrib.postgres.search` across Work Items, Projects, and Sprints
+  - Scoped workspace multi-tenancy filter
+  - Keyboard shortcut modal integration (`Ctrl+K` / `Cmd+K` QuickSearch) with instant search results and navigation
+- [ ] Frontend Analytics Dashboard & Charts:
+  - Clean executive light-theme Burndown Chart using Recharts / SVG visualization
+  - Velocity trend bar chart and Sprint health scorecard
+  - Filter by Sprint, Assignee, and Date Range
+- [ ] Automated test suite for Burndown generation, velocity calculations, and search isolation
+- [ ] OpenAPI 3.0 schema generation and documentation (learning guide, ADRs, phase report)
 
 ---
 
 ## 📅 Upcoming Phases
-- **Phase 8: Real-Time Updates & WebSockets**
 - **Phase 9: Sprint Analytics, Burndown Charts & Global Search**
 - **Phase 10: Release Hardening, Dockerization & Production Deployment**
 - **Phase v2: Enterprise AI Copilot & Integrations**

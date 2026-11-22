@@ -113,6 +113,26 @@ def create_notification(
             except Exception as sync_e:
                 logger.error(f"Fallback email delivery failed: {sync_e}")
 
+    # 4. Real-time WebSocket push (scoped to recipient in workspace)
+    if workspace_id:
+        try:
+            from apps.realtime.broadcasts import broadcast_workspace_event
+            broadcast_workspace_event(
+                workspace_id=workspace_id,
+                event_type='notification_created',
+                payload={
+                    'id': str(notification.id),
+                    'event_type': notification.event_type,
+                    'title': notification.title,
+                    'description': notification.description,
+                    'target_url': notification.target_url,
+                    'created_at': notification.created_at.isoformat(),
+                },
+                target_user_id=recipient.id
+            )
+        except Exception:
+            pass
+
     return notification
 
 

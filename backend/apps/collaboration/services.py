@@ -101,6 +101,28 @@ def add_comment(*, work_item: WorkItem, author, body: str) -> Comment:
         except Exception:
             pass
 
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=work_item.project.workspace_id,
+            event_type='comment_added',
+            payload={
+                'id': str(comment.id),
+                'work_item_id': str(work_item.id),
+                'work_item_number': work_item.item_number,
+                'key_identifier': work_item.key_identifier,
+                'body': comment.body,
+                'author': {
+                    'id': str(author.id),
+                    'email': author.email,
+                    'full_name': getattr(author, 'full_name', '') or getattr(author, 'display_name', '') or author.email,
+                },
+                'created_at': comment.created_at.isoformat(),
+            }
+        )
+    except Exception:
+        pass
+
     return comment
 
 

@@ -20,6 +20,9 @@ ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'loc
 
 # Application definition
 INSTALLED_APPS = [
+    # Daphne must be listed before django.contrib.staticfiles for runserver integration
+    'daphne',
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -28,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Third-party
+    'channels',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -41,6 +45,7 @@ INSTALLED_APPS = [
     'apps.projects',
     'apps.collaboration',
     'apps.notifications',
+    'apps.realtime',
 ]
 
 # Custom User Model (Mandatory before first migration)
@@ -76,6 +81,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
 
 # Database Setup (Supports Supabase PostgreSQL or fallback SQLite for local smoke tests / testing)
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -90,7 +96,7 @@ if IS_TESTING:
     }
 elif DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=0, ssl_require=False)
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
     }
 else:
     DATABASES = {
@@ -229,5 +235,34 @@ if EMAIL_PROVIDER == 'smtp':
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = os.getenv('EMAIL_FROM', 'noreply@taskflow.dev')
+
+# Real-Time Channel Layer (Django Channels + Upstash Redis)
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
+if IS_TESTING or not REDIS_URL or REDIS_URL.startswith('redis://localhost'):
+    # In-memory channel layer for isolated unit tests and offline testing
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+else:
+    # Upstash Redis Channel Layer with TLS support and resilient keepalive/retry options
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [
+                    {
+                        'address': REDIS_URL,
+                        'socket_timeout': 30,
+                        'socket_connect_timeout': 15,
+                        'retry_on_timeout': True,
+                        'health_check_interval': 15,
+                    }
+                ],
+            },
+        },
+    }
 
 

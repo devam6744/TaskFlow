@@ -297,6 +297,28 @@ def create_work_item(
         sprint_id=sprint_id
     )
 
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=project.workspace_id,
+            event_type='work_item_created',
+            payload={
+                'id': str(work_item.id),
+                'item_number': work_item.item_number,
+                'key_identifier': work_item.key_identifier,
+                'title': work_item.title,
+                'type': work_item.type,
+                'priority': work_item.priority,
+                'status': work_item.status,
+                'story_points': work_item.story_points,
+                'project_slug': project.slug,
+                'sprint_id': str(work_item.sprint_id) if work_item.sprint_id else None,
+                'backlog_order': work_item.backlog_order,
+            }
+        )
+    except Exception:
+        pass
+
     return work_item
 
 
@@ -345,6 +367,28 @@ def update_work_item(work_item: WorkItem, user, **fields) -> WorkItem:
         except Exception:
             pass
 
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=work_item.project.workspace_id,
+            event_type='work_item_updated',
+            payload={
+                'id': str(work_item.id),
+                'item_number': work_item.item_number,
+                'key_identifier': work_item.key_identifier,
+                'title': work_item.title,
+                'status': work_item.status,
+                'priority': work_item.priority,
+                'story_points': work_item.story_points,
+                'project_slug': work_item.project.slug,
+                'sprint_id': str(work_item.sprint_id) if work_item.sprint_id else None,
+                'backlog_order': work_item.backlog_order,
+                'assignee_id': str(work_item.assignee_id) if work_item.assignee_id else None,
+            }
+        )
+    except Exception:
+        pass
+
     return work_item
 
 
@@ -388,6 +432,23 @@ def reorder_backlog_item(
 
     work_item.backlog_order = new_order
     work_item.save(update_fields=['backlog_order', 'updated_at'])
+
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=work_item.project.workspace_id,
+            event_type='work_item_reordered',
+            payload={
+                'id': str(work_item.id),
+                'item_number': work_item.item_number,
+                'key_identifier': work_item.key_identifier,
+                'backlog_order': work_item.backlog_order,
+                'project_slug': work_item.project.slug,
+            }
+        )
+    except Exception:
+        pass
+
     return work_item
 
 
@@ -517,6 +578,21 @@ def start_sprint(
     except Exception:
         pass
 
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=sprint.project.workspace_id,
+            event_type='sprint_started',
+            payload={
+                'sprint_id': str(sprint.id),
+                'sprint_name': sprint.name,
+                'project_slug': sprint.project.slug,
+                'status': sprint.status,
+            }
+        )
+    except Exception:
+        pass
+
     return sprint
 
 
@@ -562,6 +638,22 @@ def complete_sprint(
     sprint.completed_story_points = completed_points
     sprint.actual_completed_at = timezone.now()
     sprint.save()
+
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=sprint.project.workspace_id,
+            event_type='sprint_completed',
+            payload={
+                'sprint_id': str(sprint.id),
+                'sprint_name': sprint.name,
+                'project_slug': sprint.project.slug,
+                'status': sprint.status,
+            }
+        )
+    except Exception:
+        pass
+
     return sprint
 
 
@@ -578,6 +670,22 @@ def cancel_sprint(*, sprint: Sprint, user) -> Sprint:
     sprint.work_items.all().update(sprint=None)
     sprint.status = Sprint.Status.CANCELLED
     sprint.save()
+
+    try:
+        from apps.realtime.broadcasts import broadcast_workspace_event
+        broadcast_workspace_event(
+            workspace_id=sprint.project.workspace_id,
+            event_type='sprint_cancelled',
+            payload={
+                'sprint_id': str(sprint.id),
+                'sprint_name': sprint.name,
+                'project_slug': sprint.project.slug,
+                'status': sprint.status,
+            }
+        )
+    except Exception:
+        pass
+
     return sprint
 
 
@@ -682,6 +790,27 @@ def transition_work_item_status(
                     'new_status': new_status,
                     'item_number': item.item_number,
                     'key_identifier': item.key_identifier,
+                }
+            )
+        except Exception:
+            pass
+
+        try:
+            from apps.realtime.broadcasts import broadcast_workspace_event
+            broadcast_workspace_event(
+                workspace_id=project.workspace_id,
+                event_type='work_item_updated',
+                payload={
+                    'id': str(item.id),
+                    'item_number': item.item_number,
+                    'key_identifier': item.key_identifier,
+                    'title': item.title,
+                    'status': item.status,
+                    'old_status': old_status,
+                    'project_slug': project.slug,
+                    'sprint_id': str(item.sprint_id) if item.sprint_id else None,
+                    'backlog_order': item.backlog_order,
+                    'actor_id': str(user.id) if user else None,
                 }
             )
         except Exception:

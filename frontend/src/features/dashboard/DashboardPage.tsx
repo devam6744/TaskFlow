@@ -26,6 +26,8 @@ import { ProfileModal } from './components/ProfileModal';
 import { QuickSearchModal } from './components/QuickSearchModal';
 import { NotificationBell } from './components/NotificationBell';
 import { NotificationPreferencesModal } from './components/NotificationPreferencesModal';
+import { ConnectionStatus } from '../../components/layout/ConnectionStatus';
+import { useWebSocket } from '../realtime/useWebSocket';
 import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 import { CreateWorkspaceModal } from '../workspaces/CreateWorkspaceModal';
 import { WorkspaceMembersModal } from '../workspaces/WorkspaceMembersModal';
@@ -34,6 +36,9 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useSprintStore } from '../../stores/sprintStore';
 
 export const DashboardPage: React.FC = () => {
+  // Activate real-time multi-tenant WebSocket sync
+  useWebSocket();
+
   const { user, logout } = useAuthStore();
   const addToast = useToast((state) => state.addToast);
   const navigate = useNavigate();
@@ -148,8 +153,10 @@ export const DashboardPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Right: Notifications + Search icon on mobile + Profile Button */}
+        {/* Right: Real-time Status + Notifications + Search icon on mobile + Profile Button */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <ConnectionStatus />
+
           <NotificationBell
             onOpenSettings={() => setPreferencesModalOpen(true)}
             onNavigateToWorkItem={() => setActiveTab('backlog')}
