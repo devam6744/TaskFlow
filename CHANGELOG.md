@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Asynchronous task processing architecture with Celery 5.x and Upstash Managed Serverless Redis over TLS (`rediss://`).
 - Gmail SMTP integration with automatic whitespace and chunk sanitation for Google App Passwords (`replace(" ", "").strip()`).
+- Complete Password Reset & Recovery pipeline:
+  - `POST /api/v1/auth/password-reset/` (expiring HMAC token generation with anti-enumeration protection)
+  - `POST /api/v1/auth/password-reset/confirm/` (atomic password update + single-use token invalidation)
+  - Responsive HTML template `backend/templates/emails/password_reset.html`
+  - Frontend SPA "Forgot Password" card and dedicated `/reset-password` recovery page
+  - 5/5 automated unit tests in `apps/accounts/tests/test_password_reset.py`
+- Celery eager execution default for local development (`CELERY_TASK_ALWAYS_EAGER`) enabling immediate in-process email delivery without requiring a separate worker daemon.
 - In-memory mock email backend fallback during automated test suites (`locmem`).
 - Enterprise Notifications modular app: `apps.notifications`.
 - Data models:

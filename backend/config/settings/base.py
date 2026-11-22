@@ -157,6 +157,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
 ]
 CORS_ALLOW_CREDENTIALS = True
+FRONTEND_ORIGIN = os.getenv('FRONTEND_ORIGIN', 'http://localhost:5173')
 
 # SimpleJWT Configuration (Token Rotation, Blacklist, Security)
 SIMPLE_JWT = {
@@ -206,10 +207,12 @@ if CELERY_BROKER_URL.startswith('rediss://'):
 # Celery Beat Database Scheduler
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
-# Eager task execution during automated tests
-if 'test' in sys.argv:
-    CELERY_TASK_ALWAYS_EAGER = True
-    CELERY_TASK_EAGER_PROPAGATES = True
+# Celery Task Execution Mode:
+# Default to eager execution in development so that all Celery tasks (emails, notifications, invitations, password resets)
+# execute in-process immediately without requiring a standalone celery worker daemon.
+# Can be toggled via CELERY_ALWAYS_EAGER=False in .env when running a dedicated Celery worker daemon.
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_ALWAYS_EAGER', 'True').lower() == 'true' or 'test' in sys.argv
+CELERY_TASK_EAGER_PROPAGATES = True
 
 # Email Configuration (Gmail SMTP with automatic App Password space sanitizer)
 EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'smtp').lower()

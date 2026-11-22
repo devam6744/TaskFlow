@@ -129,7 +129,7 @@ def send_email_task(self, notification_id: str):
 
 
 @shared_task(name='apps.notifications.tasks.send_invitation_email_task')
-def send_invitation_email_task(invite_id: str):
+def send_invitation_email_task(invite_id: str, raw_token: str = ''):
     """
     Delivers workspace invitation email to a newly invited email address.
     """
@@ -140,7 +140,8 @@ def send_invitation_email_task(invite_id: str):
             return False
 
         frontend_url = getattr(settings, 'FRONTEND_ORIGIN', 'http://localhost:5173').split(',')[0].strip()
-        accept_url = f"{frontend_url}/join?token={invite.token}"
+        token_param = raw_token if raw_token else getattr(invite, 'token_hash', '')
+        accept_url = f"{frontend_url}/join?token={token_param}"
 
         context = {
             'workspace_name': invite.workspace.name,
@@ -150,7 +151,15 @@ def send_invitation_email_task(invite_id: str):
         }
 
         html_message = render_to_string('emails/workspace_invite.html', context)
-        plain_message = strip_tags(html_message)
+        plain_message = (
+            f"Hello,\n\n"
+            f"You have been invited by {invite.invited_by.display_name if invite.invited_by else 'an administrator'} "
+            f"to join the {invite.workspace.name} workspace on TaskFlow as a {invite.role}.\n\n"
+            f"Click the link below to accept the invitation (valid for 7 days):\n"
+            f"{accept_url}\n\n"
+            f"If you weren't expecting this invitation, you can safely ignore this email.\n\n"
+            f"Best regards,\nTaskFlow Team"
+        )
 
         send_mail(
             subject=f"Invitation to join {invite.workspace.name} on TaskFlow",
@@ -164,6 +173,45 @@ def send_invitation_email_task(invite_id: str):
         return True
     except Exception as exc:
         logger.error(f"Error sending invitation email {invite_id}: {exc}", exc_info=True)
+        return False
+
+
+@shared_task(name='apps.notifications.tasks.send_password_reset_email_task')
+def send_password_reset_email_task(user_id: str, reset_url: str):
+    """
+    Delivers transactional password reset email with secure one-time link.
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    try:
+        user = User.objects.get(id=user_id, is_active=True)
+        context = {
+            'user': user,
+            'action_url': reset_url,
+        }
+
+        html_message = render_to_string('emails/password_reset.html', context)
+        plain_message = (
+            f"Hello {user.display_name or 'there'},\n\n"
+            f"We received a request to reset the password for your TaskFlow account ({user.email}).\n\n"
+            f"Click the link below to set up a new password (valid for 24 hours):\n"
+            f"{reset_url}\n\n"
+            f"If you did not request a password reset, you can safely ignore this email.\n\n"
+            f"Best regards,\nTaskFlow Engineering Team"
+        )
+
+        send_mail(
+            subject="[TaskFlow] Reset your account password",
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False
+        )
+        logger.info(f"Password reset email dispatched to {user.email}")
+        return True
+    except Exception as exc:
+        logger.error(f"Error sending password reset email to user {user_id}: {exc}", exc_info=True)
         return False
 
 

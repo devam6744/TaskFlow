@@ -191,6 +191,13 @@
 ## 🏁 Phase 7: Notifications & Background Processing (COMPLETED ✅)
 - [x] Integrate Celery 5.x and Upstash Managed Serverless Redis over TLS (`rediss://`)
 - [x] Configure Gmail SMTP with automatic whitespace/chunk sanitation for Google App Passwords (`replace(" ", "").strip()`)
+- [x] Implement complete Password Reset & Recovery flow:
+  - `POST /api/v1/auth/password-reset/` (anti-enumeration 24-hour token generation + Gmail SMTP dispatch)
+  - `POST /api/v1/auth/password-reset/confirm/` (HMAC token verification + single-use invalidation)
+  - Responsive HTML template `backend/templates/emails/password_reset.html`
+  - Frontend in-place "Forgot Password" card and `/reset-password` recovery page
+  - Automated unit test suite `apps/accounts/tests/test_password_reset.py` (5/5 tests passing)
+- [x] Configure Celery eager execution mode in development (`CELERY_TASK_ALWAYS_EAGER`) for immediate in-process email delivery without separate worker terminal
 - [x] Create modular Django app `apps/notifications`
 - [x] Implement `Notification` model (UUID PK, recipient FK, actor FK, workspace FK, event_type, title, description, target_url, payload, read_at, email_sent_at, email_status, idempotency_key)
 - [x] Implement `NotificationPreference` model (user FK, workspace FK, event_type, in_app_enabled, email_enabled)

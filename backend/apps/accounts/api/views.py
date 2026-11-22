@@ -12,12 +12,16 @@ from apps.accounts.api.serializers import (
     LoginSerializer,
     RegisterSerializer,
     UserProfileSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer,
 )
 from apps.accounts.services import (
     authenticate_user_credentials,
     create_user_account,
     revoke_user_refresh_token,
     rotate_user_refresh_token,
+    request_password_reset,
+    confirm_password_reset,
 )
 
 REFRESH_COOKIE_NAME = 'taskflow_refresh'
@@ -196,3 +200,63 @@ class MeView(APIView):
     def get(self, request: Request) -> Response:
         serializer = UserProfileSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PasswordResetRequestView(APIView):
+    """
+    POST /api/v1/auth/password-reset/
+    Accepts email, generates a secure 24-hour token, and sends a reset email via Gmail SMTP.
+    Employs anti-enumeration protection: always returns 200 OK regardless of whether the email exists.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        request=PasswordResetRequestSerializer,
+        responses={
+            200: OpenApiResponse(description="If this email is registered, a password reset link has been dispatched."),
+            400: OpenApiResponse(description="Invalid request payload"),
+        }
+    )
+    def post(self, request: Request) -> Response:
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        request_password_reset(email)
+
+        return Response(
+            {
+                'detail': 'If this email address is registered with TaskFlow, a password reset link has been sent to your inbox.'
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    """
+    POST /api/v1/auth/password-reset/confirm/
+    Validates the base64 UID and HMAC token, then atomically updates the user's password.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        request=PasswordResetConfirmSerializer,
+        responses={
+            200: OpenApiResponse(description="Password has been successfully reset."),
+            400: OpenApiResponse(description="Invalid token, expired token, or weak password."),
+        }
+    )
+    def post(self, request: Request) -> Response:
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        confirm_password_reset(
+            uidb64=serializer.validated_data['uid'],
+            token=serializer.validated_data['token'],
+            new_password=serializer.validated_data['new_password'],
+        )
+
+        return Response(
+            {'detail': 'Password has been successfully reset. You can now log in with your new credentials.'},
+            status=status.HTTP_200_OK
+        )

@@ -117,7 +117,7 @@ def invite_member(
     # Dispatch asynchronous invitation email via Celery
     try:
         from apps.notifications.tasks import send_invitation_email_task
-        transaction.on_commit(lambda: send_invitation_email_task.delay(str(invite.id)))
+        transaction.on_commit(lambda: send_invitation_email_task.delay(str(invite.id), raw_token))
     except Exception:
         pass
 

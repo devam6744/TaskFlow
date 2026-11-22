@@ -34,3 +34,19 @@ class LoginSerializer(serializers.Serializer):
     """Validation serializer for login input."""
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Validation serializer for requesting a password reset email."""
+    email = serializers.EmailField(max_length=255)
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Validation serializer for confirming a password reset with token."""
+    uid = serializers.CharField(required=True)
+    token = serializers.CharField(required=True)
+    new_password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+
+    def validate_new_password(self, value: str) -> str:
+        validate_password(value)
+        return value
