@@ -5,6 +5,45 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-11-23 - Phase 9: Sprint Analytics, Burndown Charts & Global Search
+### Added
+- Git feature branch isolation on `feature/v1-phase9-analytics` protecting the verified `main` release baseline.
+- Sprint Daily Snapshot model `SprintDailySnapshot` in `apps.projects` for $O(1)$ pre-aggregated daily burndown tracking.
+- Mid-sprint scope audit logging model `SprintScopeEvent` in `apps.projects` tracking tickets added or removed from active sprints.
+- Indexed timestamp field `WorkItem.resolved_at` for accurate cycle time, lead time, and dynamic historical burndown reconstruction.
+- Database migration applied to live Supabase PostgreSQL: `apps/projects/migrations/0004_workitem_resolved_at_sprintdailysnapshot_and_more.py`.
+- Analytics & Reporting Engine (`apps.projects.analytics`):
+  - `get_sprint_burndown_data`: Generates daily Ideal linear burn line vs Actual daily remaining points with dynamic pace status (`AHEAD`, `ON_TRACK`, `BEHIND`, `AT_RISK`).
+  - `get_sprint_report_metrics`: Computes Planned vs Completed story points, Scope Delta, and Type/Assignee breakdown matrices.
+  - `get_project_velocity_history`: Computes historical team velocity, average capacity benchmark, and performance trend across past completed sprints.
+  - `get_workspace_dashboard_summary`: Computes executive aggregates for assigned action items, overdue items, blocked items, and active sprints.
+- PostgreSQL Full-Text Search Engine (`apps.projects.search`):
+  - Weighted full-text search using `SearchVector` and `SearchRank` (Title: Weight A, Description: Weight B) and ticket key regex parsing (`KEY-NUM`).
+  - Strict workspace scoping and private project permission isolation.
+  - Parameterized ORM execution with zero raw SQL interpolation.
+- REST API Endpoints:
+  - `GET /api/v1/workspaces/{slug}/dashboard-summary/`
+  - `GET /api/v1/workspaces/{slug}/search/?q=...&type=...`
+  - `GET /api/v1/workspaces/{slug}/projects/{project_slug}/sprints/{id}/burndown/`
+  - `GET /api/v1/workspaces/{slug}/projects/{project_slug}/sprints/{id}/report/`
+  - `GET /api/v1/workspaces/{slug}/projects/{project_slug}/velocity/`
+- Automated test suite in `apps/projects/tests/test_analytics_and_search.py` (8/8 tests passing).
+- Full regression test suite passing: 68/68 tests (**100% pass rate**).
+- OpenAPI 3.0 schema generation verified with `drf-spectacular` (0 errors).
+- Frontend Interactive Visualizations & Executive UI:
+  - `BurndownChart.tsx`: Bespoke responsive animated SVG vector line chart with translucent gradient fill, glowing path stroke, dual modes (Points vs Items), and hover crosshair tooltip card with Ahead/Behind delta variance.
+  - `VelocityChart.tsx`: Animated grouped bar chart with planned vs completed points, benchmark average velocity line, and completion percentage tags.
+  - `SprintScorecard.tsx`: 4 executive metric cards with hover lift transitions (Progress, Delivery Rate, Scope Delta, Timeline).
+  - `SprintBreakdown.tsx`: Issue type distribution and team member contribution breakdown.
+  - `AnalyticsSkeleton.tsx`: Shimmering gradient wave loading skeleton.
+  - `DashboardOverview.tsx`: Executive pulse displaying assigned action items, active sprints health, and recent activity.
+  - `QuickSearchModal.tsx`: Live debounced `Ctrl+K` full-text search with categorized results and keyboard arrow navigation.
+  - Verified clean frontend production build (`npm run build` in 3.08s).
+- Documentation Framework:
+  - `docs/learning/phase-9_analytics_search_concepts.md`: Comprehensive concept guide.
+  - `docs/decisions/phase-9_decisions.md`: Architecture Decision Records ADR 031 through ADR 034.
+  - `docs/phase-reports/phase-9_completion.md`: Milestone completion report.
+
 ## [0.8.0] - 2026-11-22 - Phase 8: Real-Time Updates & WebSockets
 ### Added
 - Daphne ASGI application server integration and protocol routing in `backend/config/asgi.py`.

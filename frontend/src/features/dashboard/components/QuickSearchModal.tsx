@@ -1,23 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
-  Building2,
   LayoutDashboard,
   Kanban,
   Users2,
   FolderGit2,
   Plus,
   User,
-  ArrowRight,
-  Command,
+  FileText,
+  Flame,
+  Loader2,
+  BarChart2,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../../stores/workspaceStore';
 import { useProjectStore } from '../../../stores/projectStore';
+import { analyticsApi } from '../../analytics/analyticsApi';
+import type { SearchResultItem } from '../../analytics/types';
 
 interface QuickSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigateTab: (tab: 'overview' | 'kanban' | 'backlog') => void;
+  onNavigateTab: (tab: 'overview' | 'kanban' | 'backlog' | 'analytics') => void;
   onOpenProfile: () => void;
   onOpenCreateWorkspace: () => void;
   onOpenMembers: () => void;
@@ -25,7 +28,7 @@ interface QuickSearchModalProps {
 
 interface SearchItem {
   id: string;
-  category: 'Workspaces' | 'Navigation' | 'Actions';
+  category: 'Work Items' | 'Sprints' | 'Projects' | 'Workspaces' | 'Navigation' | 'Actions';
   title: string;
   subtitle?: string;
   icon: React.ReactNode;
@@ -42,27 +45,123 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [searching, setSearching] = useState(false);
+  const [remoteResults, setRemoteResults] = useState<{
+    work_items: SearchResultItem[];
+    sprints: SearchResultItem[];
+    projects: SearchResultItem[];
+  }>({ work_items: [], sprints: [], projects: [] });
+
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { workspaces, setActiveWorkspace } = useWorkspaceStore();
+  const { activeWorkspace } = useWorkspaceStore();
   const { projects, setActiveProject } = useProjectStore();
 
   useEffect(() => {
     if (isOpen) {
       setQuery('');
       setSelectedIndex(0);
+      setRemoteResults({ work_items: [], sprints: [], projects: [] });
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
 
-  // Build searchable items
-  const allItems: SearchItem[] = [
-    // Navigation items
+  // Debounced API search when query changes
+  useEffect(() => {
+    if (!isOpen || !activeWorkspace || query.trim().length < 2) {
+      setRemoteResults({ work_items: [], sprints: [], projects: [] });
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const handler = setTimeout(async () => {
+      try {
+        const res = await analyticsApi.globalSearch(activeWorkspace.slug, query.trim());
+        setRemoteResults({
+          work_items: res.work_items || [],
+          sprints: res.sprints || [],
+          projects: res.projects || [],
+        });
+      } catch {
+        // ignore
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(handler);
+  }, [query, isOpen, activeWorkspace]);
+
+  // Build items array
+  const allItems: SearchItem[] = [];
+
+  // A. If remote results exist, show them first
+  if (remoteResults.work_items.length > 0) {
+    remoteResults.work_items.forEach((item) => {
+      allItems.push({
+        id: `wi-${item.id}`,
+        category: 'Work Items',
+        title: `${item.key_identifier}: ${item.title}`,
+        subtitle: `${item.project_name} • ${item.status} • ${item.priority} Priority`,
+        icon: <FileText className="w-4 h-4 text-blue-600" />,
+        action: () => {
+          if (item.project_slug) {
+            const matchedProj = projects.find((p) => p.slug === item.project_slug);
+            if (matchedProj) setActiveProject(matchedProj);
+          }
+          onNavigateTab('backlog');
+          onClose();
+        },
+      });
+    });
+  }
+
+  if (remoteResults.sprints.length > 0) {
+    remoteResults.sprints.forEach((sprint) => {
+      allItems.push({
+        id: `sprint-${sprint.id}`,
+        category: 'Sprints',
+        title: sprint.name || 'Sprint',
+        subtitle: `${sprint.project_name} • ${sprint.status} • Goal: ${sprint.sprint_goal || 'No goal set'}`,
+        icon: <Flame className="w-4 h-4 text-emerald-600" />,
+        action: () => {
+          if (sprint.project_slug) {
+            const matchedProj = projects.find((p) => p.slug === sprint.project_slug);
+            if (matchedProj) setActiveProject(matchedProj);
+          }
+          onNavigateTab(sprint.status === 'ACTIVE' ? 'kanban' : 'backlog');
+          onClose();
+        },
+      });
+    });
+  }
+
+  if (remoteResults.projects.length > 0) {
+    remoteResults.projects.forEach((proj) => {
+      allItems.push({
+        id: `proj-${proj.id}`,
+        category: 'Projects',
+        title: `${proj.name} [${proj.key}]`,
+        subtitle: proj.description || `${proj.visibility} Project`,
+        icon: <FolderGit2 className="w-4 h-4 text-indigo-600" />,
+        action: () => {
+          const matchedProj = projects.find((p) => p.slug === proj.slug);
+          if (matchedProj) setActiveProject(matchedProj);
+          onNavigateTab('backlog');
+          onClose();
+        },
+      });
+    });
+  }
+
+  // B. Standard Navigation & Actions
+  const navItems: SearchItem[] = [
     {
       id: 'nav-overview',
       category: 'Navigation',
-      title: 'Overview & Velocity Metrics',
-      subtitle: 'Sprint progress, burndown stats, and high-level health',
+      title: 'Executive Pulse & Dashboard',
+      subtitle: 'Assigned tasks, active sprints, and engineering activity',
       icon: <LayoutDashboard className="w-4 h-4 text-blue-600" />,
       action: () => {
         onNavigateTab('overview');
@@ -70,9 +169,20 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       },
     },
     {
+      id: 'nav-analytics',
+      category: 'Navigation',
+      title: 'Sprint Reports & Burndown Analytics',
+      subtitle: 'Daily burndown charts, team velocity, and delivery metrics',
+      icon: <BarChart2 className="w-4 h-4 text-indigo-600" />,
+      action: () => {
+        onNavigateTab('analytics');
+        onClose();
+      },
+    },
+    {
       id: 'nav-backlog',
       category: 'Navigation',
-      title: 'Projects & Product Backlog',
+      title: 'Product Backlog',
       subtitle: 'Manage user stories, tasks, bugs, and Fibonacci estimates',
       icon: <FolderGit2 className="w-4 h-4 text-blue-600" />,
       action: () => {
@@ -83,8 +193,8 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
     {
       id: 'nav-kanban',
       category: 'Navigation',
-      title: 'Sprint 1 Interactive Board',
-      subtitle: 'Active backlog items, swimlanes, and task transitions',
+      title: 'Active Sprint Kanban Board',
+      subtitle: 'Swimlanes, live drag-and-drop, and task transitions',
       icon: <Kanban className="w-4 h-4 text-blue-600" />,
       action: () => {
         onNavigateTab('kanban');
@@ -116,63 +226,40 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
     {
       id: 'action-profile',
       category: 'Actions',
-      title: 'User Profile & Settings',
-      subtitle: 'Manage display name, view UUID identity, and security tokens',
+      title: 'Manage Your Profile & Security',
+      subtitle: 'Account details and credentials',
       icon: <User className="w-4 h-4 text-slate-600" />,
       action: () => {
         onOpenProfile();
         onClose();
       },
     },
-    // Dynamic workspaces
-    ...workspaces.map((ws) => ({
-      id: `ws-${ws.id}`,
-      category: 'Workspaces' as const,
-      title: ws.name,
-      subtitle: `Switch to /${ws.slug} (${ws.current_user_role || 'Member'})`,
-      icon: <Building2 className="w-4 h-4 text-blue-600" />,
-      action: () => {
-        setActiveWorkspace(ws);
-        onClose();
-      },
-    })),
-    // Dynamic projects
-    ...projects.map((proj) => ({
-      id: `proj-${proj.id}`,
-      category: 'Navigation' as const,
-      title: `${proj.name} [${proj.key}]`,
-      subtitle: `Jump to project backlog (${proj.backlog_count || 0} items)`,
-      icon: <FolderGit2 className="w-4 h-4 text-blue-600" />,
-      action: () => {
-        setActiveProject(proj);
-        onNavigateTab('backlog');
-        onClose();
-      },
-    })),
   ];
 
-  // Filter based on query
-  const filteredItems = query.trim()
-    ? allItems.filter(
-        (item) =>
-          item.title.toLowerCase().includes(query.toLowerCase()) ||
-          (item.subtitle && item.subtitle.toLowerCase().includes(query.toLowerCase())) ||
-          item.category.toLowerCase().includes(query.toLowerCase())
-      )
-    : allItems;
+  if (!query.trim()) {
+    allItems.push(...navItems);
+  } else if (allItems.length === 0) {
+    // If no remote results matched yet, filter local navigation items
+    const filteredNav = navItems.filter(
+      (item) =>
+        item.title.toLowerCase().includes(query.toLowerCase()) ||
+        (item.subtitle && item.subtitle.toLowerCase().includes(query.toLowerCase()))
+    );
+    allItems.push(...filteredNav);
+  }
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % (filteredItems.length || 1));
+      setSelectedIndex((prev) => (prev + 1) % (allItems.length || 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredItems.length) % (filteredItems.length || 1));
+      setSelectedIndex((prev) => (prev - 1 + allItems.length) % (allItems.length || 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filteredItems[selectedIndex]) {
-        filteredItems[selectedIndex].action();
+      if (allItems[selectedIndex]) {
+        allItems[selectedIndex].action();
       }
     } else if (e.key === 'Escape') {
       onClose();
@@ -193,7 +280,11 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
       <div className="relative bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-100 flex flex-col">
         {/* Search Input Bar */}
         <div className="flex items-center px-4 py-3.5 border-b border-slate-100 gap-3">
-          <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          {searching ? (
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+          ) : (
+            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          )}
           <input
             ref={inputRef}
             type="text"
@@ -203,7 +294,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search workspaces, boards, actions..."
+            placeholder="Search tickets (e.g. ALP-1), sprints, projects, or commands..."
             className="flex-1 text-xs sm:text-sm text-slate-900 placeholder-slate-400 bg-transparent focus:outline-none"
           />
           <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
@@ -212,13 +303,13 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
         </div>
 
         {/* Results List */}
-        <div className="max-h-80 overflow-y-auto p-2 space-y-1">
-          {filteredItems.length === 0 ? (
+        <div className="max-h-96 overflow-y-auto p-2 space-y-1">
+          {allItems.length === 0 ? (
             <div className="py-8 text-center text-xs text-slate-400">
-              No matching items found for "{query}".
+              No matching tickets, sprints, or commands found for "{query}".
             </div>
           ) : (
-            filteredItems.map((item, index) => {
+            allItems.map((item, index) => {
               const isSelected = index === selectedIndex;
               return (
                 <button
@@ -253,37 +344,29 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200">
-                      {item.category}
-                    </span>
-                    {isSelected && (
-                      <ArrowRight className="w-3.5 h-3.5 text-blue-600" />
-                    )}
-                  </div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 bg-slate-100/80 px-1.5 py-0.5 rounded">
+                    {item.category}
+                  </span>
                 </button>
               );
             })
           )}
         </div>
 
-        {/* Footer shortcuts */}
-        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+        {/* Keyboard Footer */}
+        <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-white border border-slate-200 rounded text-[9px]">↑</kbd>
-              <kbd className="px-1 py-0.5 bg-white border border-slate-200 rounded text-[9px]">↓</kbd>
-              <span>to navigate</span>
+              <kbd className="font-mono bg-white border border-slate-200 px-1 rounded text-[10px]">↑</kbd>
+              <kbd className="font-mono bg-white border border-slate-200 px-1 rounded text-[10px]">↓</kbd>
+              Navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-white border border-slate-200 rounded text-[9px]">↵</kbd>
-              <span>to select</span>
+              <kbd className="font-mono bg-white border border-slate-200 px-1 rounded text-[10px]">↵</kbd>
+              Open
             </span>
           </div>
-          <div className="flex items-center gap-1 font-mono">
-            <Command className="w-3 h-3 text-slate-400" />
-            <span>TaskFlow Search</span>
-          </div>
+          <span>Full-Text Scoped Search</span>
         </div>
       </div>
     </div>

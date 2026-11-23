@@ -663,6 +663,26 @@ paths:
       responses:
         '200':
           description: Workspace restored
+  /api/v1/workspaces/{workspace_slug}/dashboard-summary/:
+    get:
+      operationId: v1_workspaces_dashboard_summary_retrieve
+      description: |-
+        GET /api/v1/workspaces/{workspace_slug}/dashboard-summary/
+        Delegates to projects analytics engine for executive overview data.
+      summary: Get Workspace Dashboard Summary
+      parameters:
+      - in: path
+        name: workspace_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Dashboard summary aggregates
   /api/v1/workspaces/{workspace_slug}/projects/:
     get:
       operationId: v1_workspaces_projects_list
@@ -1638,6 +1658,37 @@ paths:
                 items:
                   $ref: '#/components/schemas/WorkItem'
           description: ''
+  /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/burndown/:
+    get:
+      operationId: v1_workspaces_projects_sprints_burndown_retrieve
+      description: |-
+        GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/burndown/
+        Returns Ideal Line vs Actual Line data points for interactive Burndown visualization.
+      summary: Get Sprint Burndown Chart dataset
+      parameters:
+      - in: path
+        name: project_slug
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: sprint_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: workspace_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Burndown dataset with Ideal and Actual time series
   /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/cancel/:
     post:
       operationId: v1_workspaces_projects_sprints_cancel_create
@@ -1768,6 +1819,37 @@ paths:
                 items:
                   $ref: '#/components/schemas/WorkItem'
           description: ''
+  /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/report/:
+    get:
+      operationId: v1_workspaces_projects_sprints_report_retrieve
+      description: |-
+        GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/report/
+        Returns Planned vs Completed metrics, Scope Delta, and Type/Assignee breakdowns.
+      summary: Get Comprehensive Sprint Performance & Scope Report
+      parameters:
+      - in: path
+        name: project_slug
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: sprint_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: workspace_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Sprint retrospective report metrics
   /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/start/:
     post:
       operationId: v1_workspaces_projects_sprints_start_create
@@ -1838,6 +1920,31 @@ paths:
       responses:
         '200':
           description: Project restored
+  /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/velocity/:
+    get:
+      operationId: v1_workspaces_projects_velocity_retrieve
+      description: |-
+        GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/velocity/
+        Returns historical velocity metrics across past completed sprints.
+      summary: Get Project Velocity History
+      parameters:
+      - in: path
+        name: project_slug
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: workspace_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Historical velocity trend dataset
   /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/work-items/{item_number}/:
     get:
       operationId: v1_workspaces_projects_work_items_retrieve
@@ -2470,6 +2577,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/WorkItem'
           description: ''
+  /api/v1/workspaces/{workspace_slug}/search/:
+    get:
+      operationId: v1_workspaces_search_retrieve
+      description: |-
+        GET /api/v1/workspaces/{workspace_slug}/search/?q=...&type=...
+        Delegates to projects full-text search engine.
+      summary: Global Workspace Full-Text Search
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Search term or ticket key
+      - in: query
+        name: type
+        schema:
+          type: string
+        description: 'Filter type: all, work_item, sprint, project'
+      - in: path
+        name: workspace_slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Scoped search results
   /api/v1/workspaces/invites/accept/:
     post:
       operationId: v1_workspaces_invites_accept_create

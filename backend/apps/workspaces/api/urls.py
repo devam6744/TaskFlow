@@ -26,4 +26,8 @@ urlpatterns = [
     # Workspace Invitations
     path('<slug:slug>/invites/', views.WorkspaceInviteListCreateView.as_view(), name='workspace-invites'),
     path('<slug:slug>/invites/<uuid:invite_id>/', views.WorkspaceInviteRevokeView.as_view(), name='workspace-invite-revoke'),
+
+    # Workspace Dashboard & Global Search (Phase 9)
+    path('<slug:workspace_slug>/dashboard-summary/', views.WorkspaceDashboardSummaryProxyView.as_view(), name='workspace-dashboard-summary'),
+    path('<slug:workspace_slug>/search/', views.WorkspaceSearchProxyView.as_view(), name='workspace-search'),
 ]

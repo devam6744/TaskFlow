@@ -32,7 +32,10 @@ urlpatterns = [
     path('<slug:project_slug>/sprints/<uuid:sprint_id>/cancel/', views.SprintCancelView.as_view(), name='sprint-cancel'),
     path('<slug:project_slug>/sprints/<uuid:sprint_id>/add-items/', views.SprintAddItemsView.as_view(), name='sprint-add-items'),
     path('<slug:project_slug>/sprints/<uuid:sprint_id>/remove-items/', views.SprintRemoveItemsView.as_view(), name='sprint-remove-items'),
+    path('<slug:project_slug>/sprints/<uuid:sprint_id>/burndown/', views.SprintBurndownView.as_view(), name='sprint-burndown'),
+    path('<slug:project_slug>/sprints/<uuid:sprint_id>/report/', views.SprintReportView.as_view(), name='sprint-report'),
     path('<slug:project_slug>/board/', views.ActiveSprintBoardView.as_view(), name='active-sprint-board'),
+    path('<slug:project_slug>/velocity/', views.ProjectVelocityView.as_view(), name='project-velocity'),
 
     # Collaboration & Work Item Activity (Phase 6)
     path('<slug:project_slug>/', include('apps.collaboration.api.urls')),

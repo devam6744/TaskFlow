@@ -335,12 +335,41 @@ def update_work_item(work_item: WorkItem, user, **fields) -> WorkItem:
             })
 
     old_assignee_id = work_item.assignee_id
+    old_sprint = work_item.sprint
+    old_status = work_item.status
 
     for field, value in fields.items():
         if hasattr(work_item, field) and field not in ['id', 'project', 'item_number', 'reporter', 'created_at']:
             setattr(work_item, field, value)
 
+    if 'status' in fields:
+        if work_item.status == WorkItem.Status.DONE and not work_item.resolved_at:
+            work_item.resolved_at = timezone.now()
+        elif work_item.status != WorkItem.Status.DONE and old_status == WorkItem.Status.DONE:
+            work_item.resolved_at = None
+
     work_item.save()
+
+    # Track mid-sprint scope changes if an active sprint's contents change
+    new_sprint = work_item.sprint
+    if old_sprint != new_sprint:
+        from apps.projects.models import SprintScopeEvent, Sprint
+        if old_sprint and old_sprint.status == Sprint.Status.ACTIVE:
+            SprintScopeEvent.objects.create(
+                sprint=old_sprint,
+                work_item=work_item,
+                event_type=SprintScopeEvent.EventType.REMOVED,
+                story_points=work_item.story_points or 0,
+                created_by=user
+            )
+        if new_sprint and new_sprint.status == Sprint.Status.ACTIVE:
+            SprintScopeEvent.objects.create(
+                sprint=new_sprint,
+                work_item=work_item,
+                event_type=SprintScopeEvent.EventType.ADDED,
+                story_points=work_item.story_points or 0,
+                created_by=user
+            )
 
     # Trigger TASK_ASSIGNED notification if assignee was set or updated
     new_assignee = work_item.assignee
@@ -553,6 +582,21 @@ def start_sprint(
     # Move items currently in BACKLOG to TODO for active sprint execution
     sprint.work_items.filter(status=WorkItem.Status.BACKLOG).update(status=WorkItem.Status.TODO)
 
+    # Record Day 0 initial burndown snapshot
+    from apps.projects.models import SprintDailySnapshot
+    today = (sprint.start_date or timezone.now().date())
+    SprintDailySnapshot.objects.update_or_create(
+        sprint=sprint,
+        snapshot_date=today,
+        defaults={
+            'total_story_points': planned_points,
+            'remaining_story_points': planned_points,
+            'completed_story_points': 0,
+            'remaining_items_count': sprint.work_items.count(),
+            'completed_items_count': 0,
+        }
+    )
+
     # Notify project members of sprint activation
     try:
         from apps.notifications.tasks import dispatch_notification_task
@@ -638,6 +682,20 @@ def complete_sprint(
     sprint.completed_story_points = completed_points
     sprint.actual_completed_at = timezone.now()
     sprint.save()
+
+    # Record completion day snapshot
+    from apps.projects.models import SprintDailySnapshot
+    SprintDailySnapshot.objects.update_or_create(
+        sprint=sprint,
+        snapshot_date=timezone.now().date(),
+        defaults={
+            'total_story_points': sprint.planned_story_points,
+            'remaining_story_points': max(0, sprint.planned_story_points - completed_points),
+            'completed_story_points': completed_points,
+            'remaining_items_count': 0,
+            'completed_items_count': sprint.work_items.filter(status=WorkItem.Status.DONE).count(),
+        }
+    )
 
     try:
         from apps.realtime.broadcasts import broadcast_workspace_event
@@ -775,7 +833,14 @@ def transition_work_item_status(
     old_status = item.status
     if old_status != new_status:
         item.status = new_status
-        item.save(update_fields=['status', 'updated_at'])
+        update_fields = ['status', 'updated_at']
+        if new_status == WorkItem.Status.DONE and not item.resolved_at:
+            item.resolved_at = timezone.now()
+            update_fields.append('resolved_at')
+        elif old_status == WorkItem.Status.DONE and new_status != WorkItem.Status.DONE:
+            item.resolved_at = None
+            update_fields.append('resolved_at')
+        item.save(update_fields=update_fields)
 
         try:
             from apps.collaboration.services import record_activity_event

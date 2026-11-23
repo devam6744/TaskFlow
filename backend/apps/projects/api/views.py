@@ -7,10 +7,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound, PermissionDenied
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from django.contrib.auth import get_user_model
 
 from apps.workspaces.models import Workspace
+from apps.workspaces.permissions import IsWorkspaceMember
 from apps.projects.models import Project, ProjectMember, WorkItem, Sprint
 from apps.projects import services, selectors
 from apps.projects.api.serializers import (
@@ -684,4 +685,132 @@ class WorkItemStatusTransitionView(BaseWorkspaceProjectView):
             new_status=serializer.validated_data['status'],
         )
         return Response(WorkItemSerializer(updated_item).data, status=status.HTTP_200_OK)
+
+
+class SprintBurndownView(BaseWorkspaceProjectView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/burndown/
+    Returns Ideal Line vs Actual Line data points for interactive Burndown visualization.
+    """
+
+    @extend_schema(
+        summary="Get Sprint Burndown Chart dataset",
+        responses={200: OpenApiResponse(description="Burndown dataset with Ideal and Actual time series")},
+    )
+    def get(self, request, workspace_slug, project_slug, sprint_id):
+        from apps.projects.analytics import get_sprint_burndown_data
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound(f"Sprint '{sprint_id}' not found.")
+
+        data = get_sprint_burndown_data(sprint)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class SprintReportView(BaseWorkspaceProjectView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/sprints/{sprint_id}/report/
+    Returns Planned vs Completed metrics, Scope Delta, and Type/Assignee breakdowns.
+    """
+
+    @extend_schema(
+        summary="Get Comprehensive Sprint Performance & Scope Report",
+        responses={200: OpenApiResponse(description="Sprint retrospective report metrics")},
+    )
+    def get(self, request, workspace_slug, project_slug, sprint_id):
+        from apps.projects.analytics import get_sprint_report_metrics
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        sprint = Sprint.objects.filter(project=project, id=sprint_id).first()
+        if not sprint:
+            raise NotFound(f"Sprint '{sprint_id}' not found.")
+
+        data = get_sprint_report_metrics(sprint)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ProjectVelocityView(BaseWorkspaceProjectView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/projects/{project_slug}/velocity/
+    Returns historical velocity metrics across past completed sprints.
+    """
+
+    @extend_schema(
+        summary="Get Project Velocity History",
+        responses={200: OpenApiResponse(description="Historical velocity trend dataset")},
+    )
+    def get(self, request, workspace_slug, project_slug):
+        from apps.projects.analytics import get_project_velocity_history
+        workspace = self.get_workspace(workspace_slug)
+        project = self.get_project(workspace, project_slug)
+
+        limit = int(request.query_params.get('limit', 10))
+        data = get_project_velocity_history(project, limit=min(max(limit, 1), 25))
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class WorkspaceDashboardSummaryView(APIView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/dashboard-summary/
+    Returns executive metrics: Assigned to Me, Overdue, Blocked, Active Sprints, and Recent Activity.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def get_workspace(self, workspace_slug: str) -> Workspace:
+        workspace = Workspace.objects.filter(slug=workspace_slug, archived_at__isnull=True).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+        return workspace
+
+    @extend_schema(
+        summary="Get Workspace Dashboard Summary",
+        responses={200: OpenApiResponse(description="Dashboard summary aggregates")},
+    )
+    def get(self, request, workspace_slug):
+        from apps.projects.analytics import get_workspace_dashboard_summary
+        workspace = self.get_workspace(workspace_slug)
+        data = get_workspace_dashboard_summary(workspace, request.user)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class GlobalWorkspaceSearchView(APIView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/search/?q=...&type=...
+    Full-text search across work items, sprints, and projects with strict tenant scoping.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    def get_workspace(self, workspace_slug: str) -> Workspace:
+        workspace = Workspace.objects.filter(slug=workspace_slug, archived_at__isnull=True).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+        return workspace
+
+    @extend_schema(
+        summary="Global Workspace Full-Text Search",
+        parameters=[
+            OpenApiParameter('q', str, description="Search term or ticket key"),
+            OpenApiParameter('type', str, description="Filter type: all, work_item, sprint, project"),
+        ],
+        responses={200: OpenApiResponse(description="Scoped search results")},
+    )
+    def get(self, request, workspace_slug):
+        from apps.projects.search import global_workspace_search
+        workspace = self.get_workspace(workspace_slug)
+        query = request.query_params.get('q', '').strip()
+        search_type = request.query_params.get('type', 'all').strip().lower()
+
+        data = global_workspace_search(
+            workspace=workspace,
+            user=request.user,
+            query=query,
+            search_type=search_type,
+            limit=25
+        )
+        return Response(data, status=status.HTTP_200_OK)
+
 

@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound, PermissionDenied
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 
 from apps.workspaces.models import Workspace, WorkspaceMember, WorkspaceInvite
 from apps.workspaces import services, selectors
@@ -310,3 +310,61 @@ class AcceptInviteView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class WorkspaceDashboardSummaryProxyView(APIView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/dashboard-summary/
+    Delegates to projects analytics engine for executive overview data.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    @extend_schema(
+        summary="Get Workspace Dashboard Summary",
+        responses={200: OpenApiResponse(description="Dashboard summary aggregates")},
+    )
+    def get(self, request, workspace_slug):
+        from apps.workspaces.models import Workspace
+        from apps.projects.analytics import get_workspace_dashboard_summary
+        workspace = Workspace.objects.filter(slug=workspace_slug, archived_at__isnull=True).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+        self.check_object_permissions(request, workspace)
+        data = get_workspace_dashboard_summary(workspace, request.user)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class WorkspaceSearchProxyView(APIView):
+    """
+    GET /api/v1/workspaces/{workspace_slug}/search/?q=...&type=...
+    Delegates to projects full-text search engine.
+    """
+    permission_classes = [IsAuthenticated, IsWorkspaceMember]
+
+    @extend_schema(
+        summary="Global Workspace Full-Text Search",
+        parameters=[
+            OpenApiParameter('q', str, description="Search term or ticket key"),
+            OpenApiParameter('type', str, description="Filter type: all, work_item, sprint, project"),
+        ],
+        responses={200: OpenApiResponse(description="Scoped search results")},
+    )
+    def get(self, request, workspace_slug):
+        from apps.workspaces.models import Workspace
+        from apps.projects.search import global_workspace_search
+        workspace = Workspace.objects.filter(slug=workspace_slug, archived_at__isnull=True).first()
+        if not workspace:
+            raise NotFound(f"Workspace '{workspace_slug}' not found.")
+        self.check_object_permissions(request, workspace)
+        query = request.query_params.get('q', '').strip()
+        search_type = request.query_params.get('type', 'all').strip().lower()
+
+        data = global_workspace_search(
+            workspace=workspace,
+            user=request.user,
+            query=query,
+            search_type=search_type,
+            limit=25
+        )
+        return Response(data, status=status.HTTP_200_OK)
+

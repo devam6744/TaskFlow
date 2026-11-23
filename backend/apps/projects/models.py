@@ -399,6 +399,12 @@ class WorkItem(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Timestamp when this item was moved to DONE"
+    )
     archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -463,4 +469,81 @@ class WorkItemDependency(models.Model):
 
     def __str__(self) -> str:
         return f"{self.blocking_item.key_identifier} blocks {self.blocked_item.key_identifier}"
+
+
+class SprintDailySnapshot(models.Model):
+    """
+    Daily snapshot of sprint progress recorded at day boundary or captured on demand.
+    Powers high-performance, historical Burndown and Cumulative Flow analytics.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sprint = models.ForeignKey(
+        Sprint,
+        on_delete=models.CASCADE,
+        related_name='daily_snapshots'
+    )
+    snapshot_date = models.DateField(db_index=True)
+    total_story_points = models.PositiveIntegerField(default=0)
+    remaining_story_points = models.PositiveIntegerField(default=0)
+    completed_story_points = models.PositiveIntegerField(default=0)
+    remaining_items_count = models.PositiveIntegerField(default=0)
+    completed_items_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'projects_sprint_daily_snapshot'
+        unique_together = [('sprint', 'snapshot_date')]
+        ordering = ['snapshot_date']
+        indexes = [
+            models.Index(fields=['sprint', 'snapshot_date'], name='sprint_snap_date_idx'),
+        ]
+        verbose_name = 'Sprint Daily Snapshot'
+        verbose_name_plural = 'Sprint Daily Snapshots'
+
+    def __str__(self) -> str:
+        return f"{self.sprint.name} [{self.snapshot_date}]: {self.remaining_story_points} pts remaining"
+
+
+class SprintScopeEvent(models.Model):
+    """
+    Audit log of work items added to or removed from a sprint after it was activated.
+    Powers Sprint Scope Delta metrics (measuring scope creep during sprint execution).
+    """
+    class EventType(models.TextChoices):
+        ADDED = 'ADDED', 'Added to Sprint'
+        REMOVED = 'REMOVED', 'Removed from Sprint'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sprint = models.ForeignKey(
+        Sprint,
+        on_delete=models.CASCADE,
+        related_name='scope_events'
+    )
+    work_item = models.ForeignKey(
+        WorkItem,
+        on_delete=models.CASCADE,
+        related_name='sprint_scope_events'
+    )
+    event_type = models.CharField(max_length=10, choices=EventType.choices)
+    story_points = models.PositiveSmallIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'projects_sprint_scope_event'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['sprint', 'event_type'], name='sprint_scope_ev_idx'),
+        ]
+        verbose_name = 'Sprint Scope Event'
+        verbose_name_plural = 'Sprint Scope Events'
+
+    def __str__(self) -> str:
+        return f"{self.sprint.name}: {self.event_type} {self.work_item.key_identifier} ({self.story_points} pts)"
+
 

@@ -20,7 +20,6 @@ import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../../stores/toastStore';
 import { useWorkspaceStore } from '../../stores/workspaceStore';
 import { apiClient } from '../../lib/api';
-import { MetricsCards } from './components/MetricsCards';
 import { KanbanBoard } from './components/KanbanBoard';
 import { ProfileModal } from './components/ProfileModal';
 import { QuickSearchModal } from './components/QuickSearchModal';
@@ -32,6 +31,8 @@ import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 import { CreateWorkspaceModal } from '../workspaces/CreateWorkspaceModal';
 import { WorkspaceMembersModal } from '../workspaces/WorkspaceMembersModal';
 import { BacklogPage } from '../backlog/BacklogPage';
+import { SprintAnalyticsPage } from '../analytics/SprintAnalyticsPage';
+import { DashboardOverview } from '../analytics/DashboardOverview';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSprintStore } from '../../stores/sprintStore';
 
@@ -47,7 +48,7 @@ export const DashboardPage: React.FC = () => {
   const { projects, activeProject, fetchProjects } = useProjectStore();
   const { activeSprint, fetchBoard } = useSprintStore();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'backlog'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'backlog' | 'analytics'>('overview');
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
@@ -269,6 +270,26 @@ export const DashboardPage: React.FC = () => {
                   )}
                 </button>
 
+                <button
+                  onClick={() => {
+                    setActiveTab('analytics');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === 'analytics'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="w-4 h-4 text-indigo-600" />
+                    <span>Reports & Analytics</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    Phase 9
+                  </span>
+                </button>
+
                 {activeWorkspace && (
                   <button
                     onClick={() => {
@@ -352,20 +373,19 @@ export const DashboardPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    addToast({
-                      type: 'info',
-                      title: 'Roadmap Milestone: Phase 9',
-                      description: 'Velocity and Burndown charts will unlock in Phase 9!',
-                    });
+                    setActiveTab('analytics');
+                    setMobileSidebarOpen(false);
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-medium transition-colors cursor-pointer text-left"
-                  title="Velocity Reports (Upcoming Phase 9)"
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200/80 text-indigo-900 font-medium transition-colors cursor-pointer text-left group"
+                  title="Click to view Burndown and Velocity Reports"
                 >
                   <div className="flex items-center gap-3">
-                    <BarChart3 className="w-4 h-4 text-slate-400" />
-                    <span>Velocity Reports</span>
+                    <BarChart3 className="w-4 h-4 text-indigo-600 group-hover:scale-105 transition-transform" />
+                    <span>Reports & Burndown</span>
                   </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 font-semibold">P9</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                    Phase 9 Active
+                  </span>
                 </button>
               </nav>
             </div>
@@ -469,18 +489,17 @@ export const DashboardPage: React.FC = () => {
             )}
 
             {activeTab === 'overview' && (
-              <>
-                <MetricsCards />
-                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
-                  <KanbanBoard />
-                </div>
-              </>
+              <DashboardOverview onNavigateToTab={setActiveTab} />
             )}
 
             {activeTab === 'kanban' && (
               <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <KanbanBoard />
               </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <SprintAnalyticsPage />
             )}
           </div>
         </main>
