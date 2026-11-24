@@ -24,6 +24,7 @@ ruff>=0.6.0
 
 # Background Jobs & Real-Time (Celery / Redis / Channels)
 celery>=5.4.0
+django-celery-beat>=2.7.0
 redis>=5.0.0
 channels>=4.1.0
 daphne>=4.1.0

@@ -3,7 +3,7 @@ services:
   - type: web
     name: taskflow-backend
     runtime: docker
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: Dockerfile
     dockerContext: backend
     plan: free
     region: oregon
@@ -36,7 +36,7 @@ services:
   - type: worker
     name: taskflow-celery-worker
     runtime: docker
-    dockerfilePath: backend/Dockerfile.celery
+    dockerfilePath: Dockerfile.celery
     dockerContext: backend
     plan: free
     region: oregon
