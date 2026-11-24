@@ -285,9 +285,6 @@ export const DashboardPage: React.FC = () => {
                     <BarChart3 className="w-4 h-4 text-indigo-600" />
                     <span>Reports & Analytics</span>
                   </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    Phase 9
-                  </span>
                 </button>
 
                 {activeWorkspace && (
@@ -307,86 +304,6 @@ export const DashboardPage: React.FC = () => {
                     </span>
                   </button>
                 )}
-              </nav>
-            </div>
-
-            {/* Upcoming Roadmap Modules */}
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 mb-2">
-                SDLC Roadmap
-              </div>
-              <nav className="space-y-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMembersModalOpen(true);
-                    setMobileSidebarOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/80 text-blue-900 font-medium transition-colors cursor-pointer text-left group"
-                  title="Click to view Workspace members & settings"
-                >
-                  <div className="flex items-center gap-3">
-                    <Building2 className="w-4 h-4 text-blue-600 group-hover:scale-105 transition-transform" />
-                    <span>Workspaces</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
-                    Phase 3 Active
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('backlog');
-                    setMobileSidebarOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 text-emerald-900 font-medium transition-colors cursor-pointer text-left group"
-                  title="Click to switch to Projects & Product Backlog"
-                >
-                  <div className="flex items-center gap-3">
-                    <FolderGit2 className="w-4 h-4 text-emerald-600 group-hover:scale-105 transition-transform" />
-                    <span>Projects & Backlog</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
-                    Phase 4 Active
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('kanban');
-                    setMobileSidebarOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200/80 text-purple-900 font-medium transition-colors cursor-pointer text-left group"
-                  title="Click to view Active Sprint Board"
-                >
-                  <div className="flex items-center gap-3">
-                    <Kanban className="w-4 h-4 text-purple-600 group-hover:scale-105 transition-transform" />
-                    <span>Sprint & Kanban</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
-                    Phase 5 Active
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('analytics');
-                    setMobileSidebarOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200/80 text-indigo-900 font-medium transition-colors cursor-pointer text-left group"
-                  title="Click to view Burndown and Velocity Reports"
-                >
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="w-4 h-4 text-indigo-600 group-hover:scale-105 transition-transform" />
-                    <span>Reports & Burndown</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
-                    Phase 9 Active
-                  </span>
-                </button>
               </nav>
             </div>
           </div>
