@@ -177,10 +177,19 @@ def get_sprint_burndown_data(sprint: Sprint) -> Dict[str, Any]:
 def get_sprint_report_metrics(sprint: Sprint) -> Dict[str, Any]:
     """
     Comprehensive sprint performance and retrospective metrics report.
-    Includes Planned vs Completed, Scope Delta, and Type/Assignee breakdowns.
+    Includes:
+      - Burndown summary time series
+      - Scope Delta (mid-sprint additions/removals)
+      - Tasks by Type breakdown
+      - Tasks by Priority breakdown
+      - Tasks by Status flow breakdown (Done, In Review, In Progress, To Do)
+      - Story Points delivered vs active vs to-do
+      - Open bugs summary (count, high/medium/urgent)
+      - Blocked items count
+      - Team member contributions with individual task badges
     """
     burndown = get_sprint_burndown_data(sprint)
-    work_items = list(sprint.work_items.filter(archived_at__isnull=True).select_related('assignee'))
+    work_items = list(sprint.work_items.filter(archived_at__isnull=True).select_related('assignee', 'project'))
 
     # Scope Delta: Items added/removed after sprint start
     scope_events = sprint.scope_events.all()
@@ -188,36 +197,162 @@ def get_sprint_report_metrics(sprint: Sprint) -> Dict[str, Any]:
     points_removed = sum(e.story_points for e in scope_events if e.event_type == SprintScopeEvent.EventType.REMOVED)
     net_scope_change = points_added - points_removed
 
-    # Type Breakdown
-    type_counts: Dict[str, Dict[str, int]] = {}
+    # Type Breakdown (Ensure all standard types exist)
+    type_counts: Dict[str, Dict[str, int]] = {
+        'STORY': {'total': 0, 'completed': 0, 'points': 0},
+        'BUG': {'total': 0, 'completed': 0, 'points': 0},
+        'TASK': {'total': 0, 'completed': 0, 'points': 0},
+        'IMPROVEMENT': {'total': 0, 'completed': 0, 'points': 0},
+    }
+
+    # Priority Breakdown (Ensure all standard priorities exist)
+    priority_counts: Dict[str, Dict[str, int]] = {
+        'URGENT': {'total': 0, 'completed': 0, 'points': 0, 'completed_points': 0},
+        'HIGH': {'total': 0, 'completed': 0, 'points': 0, 'completed_points': 0},
+        'MEDIUM': {'total': 0, 'completed': 0, 'points': 0, 'completed_points': 0},
+        'LOW': {'total': 0, 'completed': 0, 'points': 0, 'completed_points': 0},
+    }
+
+    # Status Breakdown
+    status_counts: Dict[str, Dict[str, int]] = {
+        'DONE': {'count': 0, 'points': 0},
+        'IN_REVIEW': {'count': 0, 'points': 0},
+        'IN_PROGRESS': {'count': 0, 'points': 0},
+        'TODO': {'count': 0, 'points': 0},
+    }
+
+    open_bugs = {'total': 0, 'urgent': 0, 'high': 0, 'medium': 0, 'low': 0}
+
+    # Member Breakdown
+    assignee_stats: Dict[str, Dict[str, Any]] = {}
+    total_sprint_pts = sum(i.story_points or 0 for i in work_items)
+
     for item in work_items:
+        pts = item.story_points or 0
+        is_done = (item.status == WorkItem.Status.DONE)
+
+        # 1. Type
         t = item.type
         if t not in type_counts:
             type_counts[t] = {'total': 0, 'completed': 0, 'points': 0}
         type_counts[t]['total'] += 1
-        type_counts[t]['points'] += (item.story_points or 0)
-        if item.status == WorkItem.Status.DONE:
+        type_counts[t]['points'] += pts
+        if is_done:
             type_counts[t]['completed'] += 1
 
-    # Member Breakdown
-    assignee_stats: Dict[str, Dict[str, Any]] = {}
-    for item in work_items:
-        key = item.assignee.email if item.assignee else 'Unassigned'
-        name = getattr(item.assignee, 'display_name', None) or (item.assignee.email if item.assignee else 'Unassigned')
+        # 2. Priority
+        p = item.priority
+        if p not in priority_counts:
+            priority_counts[p] = {'total': 0, 'completed': 0, 'points': 0, 'completed_points': 0}
+        priority_counts[p]['total'] += 1
+        priority_counts[p]['points'] += pts
+        if is_done:
+            priority_counts[p]['completed'] += 1
+            priority_counts[p]['completed_points'] += pts
+
+        # 3. Status flow
+        if item.status == WorkItem.Status.DONE:
+            status_counts['DONE']['count'] += 1
+            status_counts['DONE']['points'] += pts
+        elif item.status == WorkItem.Status.IN_REVIEW:
+            status_counts['IN_REVIEW']['count'] += 1
+            status_counts['IN_REVIEW']['points'] += pts
+        elif item.status == WorkItem.Status.IN_PROGRESS:
+            status_counts['IN_PROGRESS']['count'] += 1
+            status_counts['IN_PROGRESS']['points'] += pts
+        else:
+            status_counts['TODO']['count'] += 1
+            status_counts['TODO']['points'] += pts
+
+        # 4. Bugs
+        if item.type == WorkItem.Type.BUG and not is_done:
+            open_bugs['total'] += 1
+            p_lower = item.priority.lower()
+            if p_lower in open_bugs:
+                open_bugs[p_lower] += 1
+
+        # 5. Assignee
+        assignee = item.assignee
+        key = assignee.email if assignee else 'unassigned'
         if key not in assignee_stats:
+            if assignee:
+                name = getattr(assignee, 'display_name', None) or assignee.email.split('@')[0]
+                parts = [part for part in name.strip().split() if part]
+                initials = (parts[0][0] + parts[-1][0]).upper() if len(parts) > 1 else (name[:2].upper() if name else 'US')
+                email = assignee.email
+            else:
+                name = 'Unassigned'
+                initials = 'UA'
+                email = ''
+
             assignee_stats[key] = {
                 'name': name,
-                'email': key,
+                'email': email,
+                'initials': initials,
                 'total_items': 0,
                 'completed_items': 0,
+                'active_items': 0,
+                'todo_items': 0,
                 'total_points': 0,
                 'completed_points': 0,
+                'active_points': 0,
+                'todo_points': 0,
+                'percentage_of_sprint_points': 0.0,
+                'tasks': [],
             }
-        assignee_stats[key]['total_items'] += 1
-        assignee_stats[key]['total_points'] += (item.story_points or 0)
-        if item.status == WorkItem.Status.DONE:
-            assignee_stats[key]['completed_items'] += 1
-            assignee_stats[key]['completed_points'] += (item.story_points or 0)
+
+        stat = assignee_stats[key]
+        stat['total_items'] += 1
+        stat['total_points'] += pts
+        if is_done:
+            stat['completed_items'] += 1
+            stat['completed_points'] += pts
+        elif item.status in (WorkItem.Status.IN_PROGRESS, WorkItem.Status.IN_REVIEW):
+            stat['active_items'] += 1
+            stat['active_points'] += pts
+        else:
+            stat['todo_items'] += 1
+            stat['todo_points'] += pts
+
+        stat['tasks'].append({
+            'id': str(item.id),
+            'item_number': item.item_number,
+            'key_identifier': f"{item.project.key}-{item.item_number}",
+            'title': item.title,
+            'type': item.type,
+            'priority': item.priority,
+            'status': item.status,
+            'story_points': pts,
+        })
+
+    # Calculate contribution percentage for each member
+    for stat in assignee_stats.values():
+        stat['percentage_of_sprint_points'] = (
+            round((stat['total_points'] / total_sprint_pts * 100), 1)
+            if total_sprint_pts > 0 else 0.0
+        )
+
+    # Sort assignees by total points descending
+    sorted_assignees = sorted(assignee_stats.values(), key=lambda a: a['total_points'], reverse=True)
+
+    # Blocked items count via dependency graph
+    try:
+        blocked_count = WorkItemDependency.objects.filter(
+            dependee__sprint=sprint,
+            dependee__archived_at__isnull=True,
+            dependee__status__in=[WorkItem.Status.TODO, WorkItem.Status.IN_PROGRESS, WorkItem.Status.IN_REVIEW],
+            depends_on__status__ne=WorkItem.Status.DONE
+        ).values('dependee').distinct().count()
+    except Exception:
+        blocked_count = 0
+
+    # Story points split
+    points_breakdown = {
+        'done_points': status_counts['DONE']['points'],
+        'active_points': status_counts['IN_PROGRESS']['points'] + status_counts['IN_REVIEW']['points'],
+        'todo_points': status_counts['TODO']['points'],
+        'total_committed_points': total_sprint_pts,
+    }
 
     return {
         'summary': burndown,
@@ -228,20 +363,25 @@ def get_sprint_report_metrics(sprint: Sprint) -> Dict[str, Any]:
             'events_count': scope_events.count(),
         },
         'type_breakdown': type_counts,
-        'assignee_breakdown': list(assignee_stats.values()),
+        'priority_breakdown': priority_counts,
+        'status_breakdown': status_counts,
+        'points_breakdown': points_breakdown,
+        'bugs_summary': open_bugs,
+        'blocked_count': blocked_count,
+        'assignee_breakdown': sorted_assignees,
     }
 
 
 def get_project_velocity_history(project: Project, limit: int = 10) -> Dict[str, Any]:
     """
-    Computes historical velocity for past completed sprints.
+    Computes historical velocity for past completed sprints and builds
+    a full sprint performance comparison including the active sprint.
     """
+    # 1. Fetch completed sprints
     completed_sprints = list(
         Sprint.objects.filter(project=project, status=Sprint.Status.COMPLETED)
         .order_by('-actual_completed_at')[:limit]
     )
-
-    # Reverse to show chronological order
     completed_sprints.reverse()
 
     sprint_data = []
@@ -256,10 +396,14 @@ def get_project_velocity_history(project: Project, limit: int = 10) -> Dict[str,
         sprint_data.append({
             'sprint_id': str(sprint.id),
             'sprint_name': sprint.name,
+            'status': sprint.status,
+            'is_active': False,
             'planned_points': planned,
             'completed_points': completed,
             'completion_rate': rate,
             'completed_at': sprint.actual_completed_at.isoformat() if sprint.actual_completed_at else None,
+            'start_date': sprint.start_date.isoformat() if sprint.start_date else None,
+            'end_date': sprint.end_date.isoformat() if sprint.end_date else None,
         })
 
     count = len(sprint_data)
@@ -277,6 +421,45 @@ def get_project_velocity_history(project: Project, limit: int = 10) -> Dict[str,
         elif recent_avg < earlier_avg * 0.9:
             trend = 'DECREASING'
 
+    # 2. Also build comprehensive sprint comparison list (including ACTIVE sprint)
+    all_recent_sprints = list(
+        Sprint.objects.filter(
+            project=project,
+            status__in=[Sprint.Status.ACTIVE, Sprint.Status.COMPLETED]
+        ).order_by('-created_at')[:limit]
+    )
+
+    sprint_history_cards = []
+    for s in all_recent_sprints:
+        is_active = (s.status == Sprint.Status.ACTIVE)
+        if is_active:
+            done_items = s.work_items.filter(status=WorkItem.Status.DONE, archived_at__isnull=True)
+            delivered = sum(i.story_points or 0 for i in done_items)
+            carryover = s.work_items.filter(archived_at__isnull=True).exclude(status=WorkItem.Status.DONE).count()
+            planned = s.planned_story_points or sum(i.story_points or 0 for i in s.work_items.filter(archived_at__isnull=True))
+            rate = round((delivered / planned * 100), 1) if planned > 0 else 0.0
+            note = f"Live sprint · {carryover} items remaining"
+        else:
+            delivered = s.completed_story_points
+            planned = s.planned_story_points
+            rate = round((delivered / planned * 100), 1) if planned > 0 else 100.0
+            carryover = s.work_items.filter(archived_at__isnull=True).exclude(status=WorkItem.Status.DONE).count()
+            note = "Clean sprint" if carryover == 0 else f"{carryover} carryovers moved"
+
+        sprint_history_cards.append({
+            'sprint_id': str(s.id),
+            'sprint_name': s.name,
+            'status': s.status,
+            'is_active': is_active,
+            'start_date': s.start_date.isoformat() if s.start_date else None,
+            'end_date': s.end_date.isoformat() if s.end_date else None,
+            'planned_points': planned,
+            'delivered_points': delivered,
+            'delivery_rate': rate,
+            'carryover_count': carryover,
+            'note': note,
+        })
+
     return {
         'project_id': str(project.id),
         'project_name': project.name,
@@ -286,6 +469,7 @@ def get_project_velocity_history(project: Project, limit: int = 10) -> Dict[str,
         'sprints_analyzed_count': count,
         'trend': trend,
         'sprints': sprint_data,
+        'sprint_history_cards': sprint_history_cards,
     }
 
 

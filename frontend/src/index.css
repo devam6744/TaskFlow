@@ -18,3 +18,63 @@
 .animate-shake {
   animation: shake 0.35s ease-in-out;
 }
+
+/* --- Phase 9 Advanced Analytics Animations --- */
+@keyframes ring-fill {
+  from { stroke-dashoffset: 251.2; }
+}
+.ring-animate {
+  animation: ring-fill 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes bar-grow {
+  from { width: 0%; }
+}
+.bar-animate {
+  animation: bar-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes col-grow {
+  from { height: 0%; }
+}
+.col-animate {
+  animation: col-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fade-up 0.4s ease-out forwards;
+}
+.delay-1 { animation-delay: 0.08s; }
+.delay-2 { animation-delay: 0.16s; }
+.delay-3 { animation-delay: 0.24s; }
+.delay-4 { animation-delay: 0.32s; }
+.delay-5 { animation-delay: 0.40s; }
+
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.92); }
+}
+.pulse-dot {
+  animation: soft-pulse 2s ease-in-out infinite;
+}
+
+@keyframes spark-draw {
+  from { stroke-dashoffset: 600; }
+  to { stroke-dashoffset: 0; }
+}
+.spark-line {
+  stroke-dasharray: 600;
+  animation: spark-draw 1.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}

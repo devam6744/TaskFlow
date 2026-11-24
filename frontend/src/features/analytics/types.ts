@@ -46,19 +46,69 @@ export interface TypeBreakdownItem {
   points: number;
 }
 
+export interface PriorityBreakdownItem {
+  total: number;
+  completed: number;
+  points: number;
+  completed_points: number;
+}
+
+export interface StatusBreakdownItem {
+  count: number;
+  points: number;
+}
+
+export interface PointsBreakdown {
+  done_points: number;
+  active_points: number;
+  todo_points: number;
+  total_committed_points: number;
+}
+
+export interface BugsSummary {
+  total: number;
+  urgent: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export interface MemberTaskItem {
+  id: string;
+  item_number: number;
+  key_identifier: string;
+  title: string;
+  type: string;
+  priority: string;
+  status: string;
+  story_points: number | null;
+}
+
 export interface AssigneeBreakdownItem {
   name: string;
   email: string;
+  initials: string;
   total_items: number;
   completed_items: number;
+  active_items: number;
+  todo_items: number;
   total_points: number;
   completed_points: number;
+  active_points: number;
+  todo_points: number;
+  percentage_of_sprint_points: number;
+  tasks: MemberTaskItem[];
 }
 
 export interface SprintReportData {
   summary: BurndownSummary;
   scope_delta: ScopeDelta;
   type_breakdown: Record<string, TypeBreakdownItem>;
+  priority_breakdown: Record<string, PriorityBreakdownItem>;
+  status_breakdown: Record<string, StatusBreakdownItem>;
+  points_breakdown: PointsBreakdown;
+  bugs_summary: BugsSummary;
+  blocked_count: number;
   assignee_breakdown: AssigneeBreakdownItem[];
 }
 
@@ -71,6 +121,20 @@ export interface VelocitySprintItem {
   completed_at: string | null;
 }
 
+export interface SprintHistoryCardItem {
+  sprint_id: string;
+  sprint_name: string;
+  status: string;
+  is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  planned_points: number;
+  delivered_points: number;
+  delivery_rate: number;
+  carryover_count: number;
+  note: string;
+}
+
 export interface ProjectVelocityData {
   project_id: string;
   project_name: string;
@@ -80,6 +144,7 @@ export interface ProjectVelocityData {
   sprints_analyzed_count: number;
   trend: 'INCREASING' | 'STABLE' | 'DECREASING';
   sprints: VelocitySprintItem[];
+  sprint_history_cards?: SprintHistoryCardItem[];
 }
 
 export interface AssignedTaskItem {
