@@ -5,6 +5,28 @@ All notable changes to the TaskFlow project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-11-24 - Phase 10: Release Hardening, Dockerization & Production Deployment
+### Added
+- Production health check endpoint `GET /api/v1/health/` testing live PostgreSQL query execution and Upstash Redis channel layer latency.
+- Dedicated production settings module `backend/config/settings/production.py` enforcing SSL redirect, HSTS preload, secure HttpOnly cookies, and dynamic CORS/CSRF trusted origins mapping.
+- Multi-stage production `Dockerfile` for Daphne ASGI server running on non-privileged system user (`appuser`, UID 1000) with container health check.
+- Multi-stage production `Dockerfile.celery` for background worker daemon.
+- Container exclusion rules in `backend/.dockerignore` and multi-service orchestration in `docker-compose.prod.yml`.
+- Vercel frontend configuration `frontend/vercel.json` with SPA route rewrites and strict HTTP security headers.
+- Render Infrastructure-as-Code Blueprint `render.yaml` for 1-click cloud deployment of Daphne ASGI and Celery services.
+- Production environment variable template `.env.production.example`.
+- Interactive API documentation live at `/api/docs/` (Swagger UI) and `/api/redoc/` (ReDoc).
+- Comprehensive milestone completion report in `docs/phase-reports/phase-10_completion.md`.
+
+### Changed
+- Refactored frontend navigation sidebar in `frontend/src/features/dashboard/DashboardPage.tsx` to remove development SDLC Roadmap and phase badges for a clean enterprise interface.
+- Redesigned Sprint Analytics page into 4 dedicated interactive tabs: Sprint Pulse, Work Breakdown, Sprint History, and Team Contributions.
+- Upgraded `get_sprint_report_metrics` and `get_project_velocity_history` in `apps/projects/analytics.py` to deliver granular status, priority, and per-member task distributions.
+
+### Verified
+- Full regression test suite passing: 68/68 tests (**100% pass rate**).
+- Frontend production build verified clean in 3.02s with zero TypeScript errors.
+
 ## [0.9.0] - 2026-11-23 - Phase 9: Sprint Analytics, Burndown Charts & Global Search
 ### Added
 - Git feature branch isolation on `feature/v1-phase9-analytics` protecting the verified `main` release baseline.
