@@ -30,12 +30,13 @@ REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days in seconds
 
 def set_refresh_cookie(response: Response, refresh_token: str) -> None:
     """Helper to attach the JWT refresh token securely in an HttpOnly cookie."""
+    samesite_mode = getattr(settings, 'REFRESH_COOKIE_SAMESITE', 'Lax')
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=refresh_token,
         max_age=REFRESH_COOKIE_MAX_AGE,
         httponly=True,
-        samesite='Lax',
+        samesite=samesite_mode,
         secure=not settings.DEBUG,
         path='/api/v1/auth/',
     )
@@ -43,10 +44,11 @@ def set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 def clear_refresh_cookie(response: Response) -> None:
     """Helper to remove the JWT refresh cookie from the browser."""
+    samesite_mode = getattr(settings, 'REFRESH_COOKIE_SAMESITE', 'Lax')
     response.delete_cookie(
         key=REFRESH_COOKIE_NAME,
         path='/api/v1/auth/',
-        samesite='Lax',
+        samesite=samesite_mode,
     )
 
 

@@ -52,6 +52,14 @@ else:
         'http://127.0.0.1:5173',
     ]
 
+# Automatically allow any Vercel deployment preview URL and local hosts
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    r"^https://.*\.vercel\.app$",
+    r"^https://.*\.onrender\.com$",
+]
+CORS_ALLOW_CREDENTIALS = True
+
 csrf_env = os.getenv('CSRF_TRUSTED_ORIGINS', '')
 if csrf_env:
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_env.split(',') if o.strip()]
@@ -59,7 +67,14 @@ else:
     CSRF_TRUSTED_ORIGINS = [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
+        'https://*.vercel.app',
+        'https://*.onrender.com',
     ]
+
+# Session & CSRF cookie SameSite in production
+SESSION_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SAMESITE = 'None'
+REFRESH_COOKIE_SAMESITE = os.getenv('REFRESH_COOKIE_SAMESITE', 'None')
 
 # Production Database Connections (disable persistent connections on Supabase free tier)
 CONN_MAX_AGE = int(os.getenv('CONN_MAX_AGE', '0'))
