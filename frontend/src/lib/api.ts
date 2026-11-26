@@ -69,15 +69,19 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Request token refresh using HttpOnly cookie
+        // Request token refresh using HttpOnly cookie with fallback payload for cross-domain environments
+        const rfToken =
+          useAuthStore.getState().refreshToken ||
+          (typeof window !== 'undefined' ? localStorage.getItem('taskflow_rf') : null);
+
         const refreshResponse = await axios.post(
           `${BASE_URL}/auth/refresh/`,
-          {},
+          rfToken ? { refresh: rfToken } : {},
           { withCredentials: true }
         );
 
-        const { access, user } = refreshResponse.data;
-        useAuthStore.getState().setAuth(user, access);
+        const { access, refresh, user } = refreshResponse.data;
+        useAuthStore.getState().setAuth(user, access, refresh);
 
         processQueue(null);
         return apiClient(originalRequest);

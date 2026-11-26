@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
@@ -30,25 +32,25 @@ REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days in seconds
 
 def set_refresh_cookie(response: Response, refresh_token: str) -> None:
     """Helper to attach the JWT refresh token securely in an HttpOnly cookie."""
-    samesite_mode = getattr(settings, 'REFRESH_COOKIE_SAMESITE', 'Lax')
+    is_cross_site = not settings.DEBUG or os.getenv('RENDER') == 'true' or getattr(settings, 'SESSION_COOKIE_SAMESITE', '') == 'None'
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=refresh_token,
         max_age=REFRESH_COOKIE_MAX_AGE,
         httponly=True,
-        samesite=samesite_mode,
-        secure=not settings.DEBUG,
+        samesite='None' if is_cross_site else 'Lax',
+        secure=True if is_cross_site else False,
         path='/api/v1/auth/',
     )
 
 
 def clear_refresh_cookie(response: Response) -> None:
     """Helper to remove the JWT refresh cookie from the browser."""
-    samesite_mode = getattr(settings, 'REFRESH_COOKIE_SAMESITE', 'Lax')
+    is_cross_site = not settings.DEBUG or os.getenv('RENDER') == 'true' or getattr(settings, 'SESSION_COOKIE_SAMESITE', '') == 'None'
     response.delete_cookie(
         key=REFRESH_COOKIE_NAME,
         path='/api/v1/auth/',
-        samesite=samesite_mode,
+        samesite='None' if is_cross_site else 'Lax',
     )
 
 
@@ -80,6 +82,7 @@ class RegisterView(APIView):
             {
                 'user': UserProfileSerializer(user).data,
                 'access': tokens['access'],
+                'refresh': tokens['refresh'],
                 'message': 'Registration successful.',
             },
             status=status.HTTP_201_CREATED,
@@ -123,6 +126,7 @@ class LoginView(APIView):
             {
                 'user': UserProfileSerializer(user).data,
                 'access': tokens['access'],
+                'refresh': tokens['refresh'],
                 'message': 'Login successful.',
             },
             status=status.HTTP_200_OK,
@@ -154,6 +158,7 @@ class CookieTokenRefreshView(APIView):
             {
                 'user': UserProfileSerializer(user).data,
                 'access': new_tokens['access'],
+                'refresh': new_tokens['refresh'],
             },
             status=status.HTTP_200_OK,
         )

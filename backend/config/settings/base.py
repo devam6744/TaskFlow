@@ -16,7 +16,13 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-taskflow-default-secret-key-dev-only')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',') if host.strip()]
+raw_allowed_hosts = os.getenv('DJANGO_ALLOWED_HOSTS', os.getenv('ALLOWED_HOSTS', '*'))
+ALLOWED_HOSTS = [h.strip() for h in raw_allowed_hosts.split(',') if h.strip()]
+if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1', '.onrender.com', '.vercel.app'])
+    ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))
 
 # Application definition
 INSTALLED_APPS = [
@@ -156,24 +162,38 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
 }
 
-# CORS Configuration
-DEFAULT_ALLOWED_ORIGINS = 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
-CORS_ALLOWED_ORIGINS = list(set([
-    origin.strip() for origin in os.getenv('CORS_ALLOWED_ORIGINS', DEFAULT_ALLOWED_ORIGINS).split(',') if origin.strip()
-] + ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']))
-CSRF_TRUSTED_ORIGINS = list(set([
-    origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS', DEFAULT_ALLOWED_ORIGINS).split(',') if origin.strip()
-] + ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']))
+# CORS & CSRF Configuration
+raw_cors = os.getenv('CORS_ALLOWED_ORIGINS', '')
+cors_list = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']
+if raw_cors:
+    # Auto-strip trailing slash and whitespace so https://...vercel.app/ works seamlessly
+    cors_list.extend([o.strip().rstrip('/') for o in raw_cors.split(',') if o.strip()])
+
+CORS_ALLOWED_ORIGINS = list(set(cors_list))
+
+raw_csrf = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+csrf_list = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://*.vercel.app',
+    'https://*.onrender.com',
+]
+if raw_csrf:
+    csrf_list.extend([o.strip().rstrip('/') for o in raw_csrf.split(',') if o.strip()])
+csrf_list.extend(CORS_ALLOWED_ORIGINS)
+CSRF_TRUSTED_ORIGINS = list(set(csrf_list))
+
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
-    r"^https://.*\.vercel\.app$",
-    r"^https://.*\.onrender\.com$",
+    r"^https:\/\/.*\.vercel\.app$",
+    r"^https:\/\/.*\.onrender\.com$",
+    r"^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$",
 ]
 CORS_ALLOW_CREDENTIALS = True
 FRONTEND_ORIGIN = os.getenv('FRONTEND_ORIGIN', 'http://localhost:5173')
 
 # SimpleJWT Configuration (Token Rotation, Blacklist, Security)
-REFRESH_COOKIE_SAMESITE = 'Lax'
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),

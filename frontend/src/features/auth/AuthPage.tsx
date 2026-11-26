@@ -106,8 +106,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
           password,
         });
 
-        const { user, access } = response.data;
-        setAuth(user, access);
+        const { user, access, refresh } = response.data;
+        setAuth(user, access, refresh);
         addToast({
           type: 'success',
           title: 'Welcome Back',
@@ -121,8 +121,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login' }) => 
           password,
         });
 
-        const { user, access } = response.data;
-        setAuth(user, access);
+        const { user, access, refresh } = response.data;
+        setAuth(user, access, refresh);
         addToast({
           type: 'success',
           title: 'Account Created',
