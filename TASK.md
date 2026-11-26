@@ -320,7 +320,7 @@
 - [x] Production health check endpoint: `GET /api/v1/health/` returning live DB + Redis status with latency
 - [x] Production settings & security headers: `config/settings/production.py` (SSL redirect, HSTS, Secure cookies, CORS)
 - [x] Production Docker configuration: `Dockerfile` for Daphne ASGI backend, `Dockerfile.celery` for background worker
-- [x] Deployment configurations & guides: Vercel frontend config (`vercel.json`) and Render Blueprint (`render.yaml`)
+- [x] Deployment configurations & guides: Vercel full-stack deployment (frontend & backend zero-config `vercel.json`)
 - [x] Interactive OpenAPI Swagger UI (`/api/docs/`) and ReDoc (`/api/redoc/`) verified
 - [x] Left navigation sidebar cleaned: removed development SDLC Roadmap and phase badges
 - [x] Full regression test suite passing (68/68 tests passing, 100% pass rate)
