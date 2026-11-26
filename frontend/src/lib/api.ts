@@ -6,8 +6,11 @@ const getApiBaseUrl = () => {
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
-  const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
-  return `http://${host}:8000/api/v1`;
+  // When running on Vercel or any non-localhost host, use relative /api/v1 matching public rewrite
+  if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api/v1';
+  }
+  return 'http://127.0.0.1:8000/api/v1';
 };
 
 const BASE_URL = getApiBaseUrl();
