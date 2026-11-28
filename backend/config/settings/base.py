@@ -90,7 +90,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
-ASGI_APPLICATION = 'config.asgi.application'
+if not os.getenv('VERCEL'):
+    ASGI_APPLICATION = 'config.asgi.application'
 
 # Database Setup (Supports Supabase PostgreSQL or fallback SQLite for local smoke tests / testing)
 DATABASE_URL = os.getenv('DATABASE_URL')
