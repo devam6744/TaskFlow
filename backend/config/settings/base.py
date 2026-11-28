@@ -7,8 +7,11 @@ from dotenv import load_dotenv
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-# Include 'apps' directory in sys.path for clean app imports
-sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+apps_dir = os.path.join(BASE_DIR, 'apps')
+if apps_dir not in sys.path:
+    sys.path.insert(0, apps_dir)
 
 # Load environment variables from root or backend directory
 load_dotenv(BASE_DIR.parent / '.env')

@@ -7,6 +7,14 @@ the Channels URL router wrapped in JWTAuthMiddlewareStack.
 """
 
 import os
+import sys
+from pathlib import Path
+
+# Add backend directory to sys.path
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')

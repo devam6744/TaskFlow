@@ -3,7 +3,8 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "django"
+      "framework": "django",
+      "entrypoint": "config.wsgi:application"
     },
     "frontend": {
       "root": "frontend",

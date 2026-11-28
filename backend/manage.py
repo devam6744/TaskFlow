@@ -2,6 +2,15 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+
+# Add backend directory to sys.path so 'config' and 'apps' are discoverable regardless of execution cwd
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+# Always export default DJANGO_SETTINGS_MODULE at module level for Vercel/serverless inspection
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 
 def main():
@@ -20,3 +29,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
